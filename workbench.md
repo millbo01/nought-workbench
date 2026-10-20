@@ -2,7 +2,11 @@
 
 A browser screen over the engine: the mapped system, an editable scenario, a baseline and an intervention run side by side, and what the engine computed for both. Every number is the engine's own, computed on this machine from the mapped model and the scenario values shown. Nothing on the screen is estimated by AI, and the browser calculates nothing: it sends the scenario to a small local server, which runs `run`, `runWork` and `runBacklog` and returns the exact traces.
 
-## Setting it up
+## The published version
+
+The workbench is published at https://n-ought.com/nought-workbench/, where the engine runs in your browser: nothing to install, and nothing you enter leaves the page. Every push to this repository rebuilds it, checks the compiled engine against every golden hash, and republishes it to the public repository millbo01/nought-workbench (this repository stays private; only the build is public). The page links to this guide and to the engine's handover for reviewers.
+
+## Setting it up locally
 
 You need Node.js 22.18 or later (tested on 24.20). Nothing else needs installing to run the workbench: the engine has no runtime dependencies.
 
