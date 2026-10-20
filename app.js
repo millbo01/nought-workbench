@@ -585,7 +585,7 @@ async function start() {
   }
   if (IN_BROWSER) {
     const footer = $('#footer');
-    footer.innerHTML = 'For reviewers: <a href="./handover-for-gpt.md">the engine as built (handover-for-gpt.md)</a> · <a href="./workbench.md">how to use the workbench</a> · <a href="./build.json">this build</a>';
+    footer.innerHTML = 'For reviewers: <a href="./docs/for-gpt.md">status for GPT and reading list</a> · <a href="./handover-for-gpt.md">the engine as built (handover-for-gpt.md)</a> · <a href="./workbench.md">how to use the workbench</a> · <a href="./build.json">this build</a>';
     footer.hidden = false;
   }
   state.examples = await api('/api/examples');

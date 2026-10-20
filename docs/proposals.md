@@ -1,0 +1,252 @@
+# Proposals
+
+Every rule, default or convention in the engine that is not CANON, with the reason it is there. None of these is theory; each can be withdrawn or replaced by James. James's rulings on open questions are in [decisions.md](decisions.md); where a ruling is carried out by mapping data or a core check, it is named below. A run lists every proposal in force in its stamp (`stamp.proposals`), so no result can be read as canonical while a proposal shaped it.
+
+**Ids.** P-ALLOC-01, P-LOAD-01 and P-IPF-01 to P-IPF-06 are the ids of the Unified Core Spec v0.2 catalogue (engine 0.2.0, 2026-10-20). P-WORK-01 and P-DEP-01 are the Functional Work and Dependencies Contract's (2026-10-20); P-LOAD-02 is the tracking-only backlog handoff's (2026-10-20). PROP- ids are the engine's own, kept until they can be matched to that catalogue (Q-030).
+
+Kinds:
+- **Policy:** passed in explicitly; the core never uses it by default.
+- **Core loop or schema:** the engine cannot run at all without some choice here; the choice is made as narrowly as possible, written down, and listed in every run it affects.
+- **Check:** a flag or validation drawn from APPLICATION.md, labelled as a proposal, never an error that CANON would not give.
+- **Work extension:** computed only by `runWork`, after and apart from the base run, for a work attachment that enables it; the base run never sees it.
+- **Tracking extension:** computed only by `runBacklog` or `backlogFromTraces`, from finished base and work traces, and never fed back into a run.
+- **Disabled:** registered so its id is reserved, and refused if anyone tries to use it.
+
+| ID | Kind | In force | Summary |
+|---|---|---|---|
+| P-ALLOC-01 | policy | only when passed; used by the fixtures | Graded overcommitment rule: James's working position, formalised (was PROP-DRAW-01) |
+| P-LOAD-01 | opt-in | only where a scenario enables it | Per-part unit loss and rebuilding, form approved by James 2026-10-20; backlog and damage dials undefined |
+| P-WORK-01 | work extension | only in runWork, for an attachment that enables it | Useful work from a part's own resources: reference output, recipe, capacity, yield, work not done (approved as optional 2026-10-20) |
+| P-DEP-01 | work extension | only in runWork, for an attachment that maps links | A same-step, non-exclusive functional cap on an existing dependency (approved as optional 2026-10-20) |
+| P-LOAD-02 | tracking extension | only in runBacklog, for a backlog attachment that enables it | Carryable obligations, tracking only: a ledger of eligible obligations from a finished run and its work, with no feedback (approved 2026-10-20) |
+| P-IPF-01 to P-IPF-06 | disabled | never | The IPF proposals of the Unified Core Spec catalogue; not defined in this repository |
+| PROP-STEP-01 | core loop | every run | Step sequence, the timing of sensing, interventions before switches |
+| PROP-FLOW-01 | core loop | every run | Only stores hold resource from one step to the next |
+| PROP-RANK-01 | core loop | every run | Position within a layer as documented at mapping; parts with no path to the top in the bottom layer (decision Q-017) |
+| PROP-SENSE-01 | schema | runs whose model sets a dial | A sending dial per level says what its producing part sends when short (decision Q-004) |
+| PROP-ROUTE-01 | core loop | every run | Route capacity as a rule on sensed levels; routes from the shared flow only (decision Q-010); no route, no network cap |
+| PROP-STORE-01 | schema | runs with a store | Store release and fill limits as rules on sensed levels |
+| PROP-SILENCE-01 | schema | runs where a rule reads a level | A rule states its response to silence read as alarm |
+| APP-04 | check | scenario validation | A scenario is a load applied to a system, not a system |
+| APP-08 | check | every run (flag) | A top short while another part is not is flagged |
+
+## P-ALLOC-01: graded overcommitment rule
+
+**Source:** James's working position, addendum of 2026-10-20: "When committed access exceeds what arrives, lower-ranked parts lose more, and the grading comes from the settings (access rules), not from a strict queue." Renamed from PROP-DRAW-01 to the catalogue id on 2026-10-20; the behaviour is unchanged.
+
+**Why a proposal:** CANON does not say who takes what from the shared flow within a step (C3.4b, C4.2; Q-001, parked: the draw stays a proposal). Whether a part draws up to its access when that exceeds its requirement was Q-002, now decided: it does (decisions.md), and the core checks that of every policy. The core has only the allocation interface (`DrawPolicy`) and no default: without a policy every draw is refused ("unspecified allocation policy") and everything else is computed. The core checks any policy against the limits CANON does state (realised flow never above access or route capacity, C2.5n; nothing taken that did not enter, C1.1; stores within their room, C2.6), and refuses a result that breaks one rather than using it.
+
+**What it does** (src/proposals/allocation-graded.ts):
+1. A part's committed draw is its access, capped by its route.
+2. Where the committed draws fit within what entered, each part receives its committed draw, even beyond its requirement. Stores fill from what is left, in proportion to their room.
+3. Where they do not fit, the excess is taken from the parts other than the top, in proportion to committed draw times a **grading** declared with each part's setting (`proposalData["P-ALLOC-01"].grading`, a positive number), with no part taken below zero (proportional water-filling, exact). Lower-ranked parts carry larger gradings, so they lose more. A missing grading refuses the draw as an unknown prerequisite.
+4. The top is lowered only once every other part's draw is at zero.
+
+**Where this goes beyond James's words** (each a formalisation choice, for him to confirm or change):
+- "Grading comes from the settings" is read as a number declared with each setting. An alternative that uses no new number: take the cut as if every setting were read at a common lower sensed level, so a setting that falls more steeply loses more. That needs settings that read a common level and is not implemented.
+- The cut is proportional to committed draw times grading. A strict queue is the special case of very unequal gradings; the rule never reaches it exactly.
+- Parts draw up to access, not up to requirement: no longer a formalisation choice, but decision Q-002, checked by the core for every policy. It is also what lets CANON 1's fourth exception (taking back what a part receives beyond its requirement) be expressed at all.
+- Store filling (point 2) is part of the draw because a store taking from the shared flow is a draw on it; proportional to room is a placeholder (Q-003).
+- Point 4 reads CANON 4's "limiting everyone else's access first" as "the top is lowered only after every other part is at zero".
+- **No look-ahead** (alignment item 9): the rule divides what actually arrives in this step. That is the arithmetic of the shared flow, an arrangement declared in advance, not the governor responding to this step's arrival; the governor sees the consequence only through levels in a later step. If James reads the graded cut as the governor's response, it would be look-ahead and needs another form (Q-031).
+
+**Checks:** `checkGradedAllocationData(model)` flags a missing or non-positive grading, and any mode where a lower-ranked part has a smaller grading than a higher-ranked one for the same resource. Both fixtures pass.
+
+## P-LOAD-01: per-part unit loss and rebuild (approved form, off by default)
+
+The per-part dials of the 2026-10-20 addendum, named by the catalogue: `loadDials` on a part, with `unitLossUnderShortfall`, `unitRebuilding`, `backlog` and `damage`, each a set of parameters or an explicit gap. The unit-loss and rebuild dials are read only in a run whose scenario enables P-LOAD-01, by the approved form below. The backlog and damage dials are never read (P-LOAD-02 does not read the backlog dial either), and damage stays refused (Q-015). Without P-LOAD-01, units after a shortfall are refused as an unsupported rule naming P-LOAD-01 (Q-016). P-LOAD-01 is not an allocation policy: a run given it as one stops at initialisation. Validation checks the dials whenever they are present (`load-dial`).
+
+### The form for unit loss and rebuilding (approved by James, 2026-10-20)
+
+Asked for under Q-016 and approved as written (decisions.md). It is off by default and enabled per run only when a scenario asks: `"enable": ["P-LOAD-01"]`. The parameters use the existing dial shape (a set of named numbers on the part).
+
+- **Unit loss under shortfall** (`loadDials.unitLossUnderShortfall`): one rate per resource, `parameters: { <resource>: k }`, the units lost per unit of upkeep not covered. At the end of each step, the part loses `min(units, the largest of k x upkeep shortfall over its resources)`. It loses nothing for work shortfall alone: with its upkeep covered, its units are kept and the work is simply not done.
+- **Rebuilding** (`loadDials.unitRebuilding`): `parameters: { perStep: m, <resource>: c }`, at most m units rebuilt per step, at a cost of c of each named resource per unit rebuilt. Only units lost under the rule above can be rebuilt. Rebuilding is paid from the unused amount left after every part has drawn and every store has filled (CANON 3: "paid from what is left once every part has drawn"): rebuilt = `min(units lost so far, m, the smallest of unused / c over the named resources)`. The cost is recorded in the reconciliation as a use of the unused amount, and the rebuilt units count from the next step.
+- **Several parts rebuilding from one resource** share what is left in proportion to their claims (`c x min(units lost so far, m)`), as stores share what is left under P-ALLOC-01.
+- **Units become unit equivalents** (exact rationals, not whole counts) for a part with these dials, so no rounding rule is needed.
+- **Choices in this form, for James:**
+  - loss driven by upkeep shortfall rather than all shortfall;
+  - the largest rather than the sum across resources;
+  - rebuilding after stores fill rather than sharing with them;
+  - proportional sharing between parts;
+  - fractional units.
+- **Not covered:** the backlog and damage dials stay undefined; damage remains Q-015 (parked).
+- **How the engine runs it** (engineering, within the approved form):
+  - A part needs both dials. With one, its units are refused (unknown prerequisite); with neither, they are refused after a shortfall as before (Q-016's refusal names P-LOAD-01).
+  - "Units lost so far" includes this step's loss, so a unit lost in a step can be rebuilt in the same step if something is left.
+  - What is left for rebuilding is the unused amount after every part drew and every store filled. A part's share that one resource cannot use (because another named resource binds) stays unused; it is not shared again.
+  - The spend appears in the reconciliation as `rebuilding`; `unused` is what is left after it. CANON 1's ledger still reads "fully used" as nothing left after parts and stores.
+  - Each part's unit record shows `lost` and `rebuilt` for the step; both count from the next step.
+  - The fixture variant `organisation-unit-loss` enables it. IT support and scheduling lose units while their upkeep goes uncovered, and rebuild them from the money left once income recovers.
+
+## P-WORK-01: useful work from a part's own resources (optional, approved 2026-10-20)
+
+**Source:** the "N-ought Functional Work and Dependencies Contract" v0.2, as resolved by the "Work Contract Review Resolution" v0.3 with the review's seven amendments ([work-contract-review.md](work-contract-review.md)), approved by James on 2026-10-20 as an optional modelling proposal, not a CANON law. The rulings are in [decisions.md](decisions.md) (work extension). The contract revision this engine computes is 0.3.
+
+**Why a proposal:** CANON says what parts are (C2.3) and that work not done never lowers requirement (C3.12c). APPLICATION's capacity line says how much work a part gets from what it draws is a property of the part, fixed at mapping, and that a part limited by its capacity, not its access, has no shortfall: what it does not do is work not done. Neither gives a rule for counting work. The base run counts resources only: requirement, what is received, shortfall, and what is left for work after upkeep (`remainderForWork`).
+
+**Where it runs:** only in `runWork(modelDoc, scenarioDoc, attachmentDoc, options)` (src/proposals/work/). It validates a work attachment against the model and the model's exact digest, runs the unchanged `run()` once, and computes a separate, versioned work trace from that trace alone (`workFromTrace`, pure). `run()` never computes work, a scenario cannot enable P-WORK-01, and without an attachment there is no work result, not a result of 0.
+
+**The attachment** (a separate document; examples in fixtures/work/): its version, id, the model's id and digest (`RunStamp.mapping.sha256`; decision 10), the proposals it enables with their versions, and per part at most one work:
+- the work's id, its unit (`workUnit`, never a resource unit) and a definition of what is counted;
+- `referenceOutputRule`: the reference output, a documented work benchmark or externally given workload, never a governor band, a part's demand or a PAM requirement (decision 1). Constant, linear or table on the part's own declared loads, non-negative and non-decreasing in this release (decision 6);
+- `recipe`: resource per work unit, above 0, for resources the part requires and states upkeep for, 0 allowed (decision 4);
+- `capacity`: a constant with a rationale for why it does not depend on the unit count, or a per-unit amount times the units at the start of the step (decision 3);
+- `yield`: a fraction in [0, 1] of the mapped recipe, not a physical efficiency.
+
+Any of the last four may be an explicit gap, refused where used and never read as 0 or 1.
+
+**The calculation** (per part p, step t and recipe resource r):
+- available = the base trace's `remainderForWork[p, r, t]`, as it stands there (with its refusal ids);
+- recipe limit = available / recipe amount; resource-limited output = the least recipe limit;
+- yielded resource output = yield x resource-limited output;
+- pre-dependency output = the least of reference output, capacity and yielded resource output;
+- actual output = the least of pre-dependency output and each enabled P-DEP-01 cap into p;
+- work not done = reference output less actual output, never below 0.
+
+**Known zeros** (decision 5): every term is 0 or more, so a known 0 settles a minimum, or the product with yield, even where another term is refused. The binding report then lists the terms equal to the output and, apart, the refused (unresolved) terms; it is refused where the output is. A known 0 never settles an unsupported rule on the record's own work or its own incoming links (several works on the part, a same-step cycle through it, a lag, finite shared support).
+
+**Refused, not computed:** several works on one part (decision 8: how one recipe is shared is not given); a part that sets its own access, which has no receipt or unit count in the base trace (Q-014); a per-unit capacity where the base trace refuses the unit count (Q-016 without P-LOAD-01); a computed reference output below 0 (a guard: with loads non-negative from schema 0.4.0, no valid document gives one). Refusal ids it creates start `work/`; refusals carried from the base trace keep their ids (decision 9).
+
+**What it never changes:** the base trace. No work value changes a governor, setting, mode, sensed level, requirement, access, receipt, rank, store, unit count or shortfall, and no work value becomes a level (a level cannot measure work). A part may receive more than it uses productively: the receipt, excess and reconciliation stand, with no refund.
+
+**Checks:** validation codes `work-*` (handover section 2), with flags for what is accepted and refused when computed (`work-several-on-part`, `work-link-lag`, `work-link-exhaustible`, `work-separate-case`).
+
+**Fixtures:** `organisation-availability` and `organisation-shared-support` over the organisation model (decision 13, numbers hypothetical, for James to review), with golden work hashes in tests/golden/work-hashes.json (`npm run golden:work`). In the availability example IT support's work is keeping the shared systems up; in the income cut it has no money left for work from step 2, its systems are down, and its links hold finance and scheduling at 0.
+
+## P-DEP-01: a functional cap on an existing dependency (optional, approved 2026-10-20)
+
+**Source and status:** as P-WORK-01. An ordinary dependency stays rank-only: P-DEP-01 adds a cap only where an attachment that enables it maps a link.
+
+**A link:** `part` (upstream, A) and `feeds` (downstream, B), matching an existing dependency in which A feeds B; the two works' units (`workUnits`), checked against the works; `ratio`, A's work units per one of B's, above 0; `lagSteps`; `semantics`; a rationale.
+
+**The cap:** B's actual output is at most A's actual output / ratio, in the same step. Nothing is deducted from A, and A's output is not divided between its dependants: the link is a limit on B, not a supply to it, and never a resource route.
+
+**First-release scope** (D-3, D-4, accepted 2026-10-20):
+- `non-exclusive-enablement` only: A's work enables B without being used up by it (for example, systems kept available that several parts use at once). A link declared `exhaustible-support` (finite support shared between recipients) is accepted and refused when computed, as an unsupported rule: how A's output would be divided is not given.
+- Same step only: a lag above 0 is accepted and refused when computed.
+- Acyclic only: the parts of a same-step cycle among enabled links have their actual output refused (no evaluation order is given, and none is chosen); their own pre-dependency output stands, and parts outside the cycle are computed.
+- Links are evaluated in dependency order, upstream first, ties by id. A refused upstream output refuses the downstream output (unless a known 0 settles it), and the downstream part keeps its reference output, pre-dependency output, resource limits and every PAM value.
+
+### Not yet given for P-WORK-01 and P-DEP-01 (later, not blocking)
+
+Logged in [open-questions.md](open-questions.md) and set out with options in the handover (section 6).
+
+- WQ-01: how finite, shared support is divided between several recipients (D-4): a distinct proposal, never a part-to-part resource transfer.
+- WQ-02: lagged links (D-3); they need output history and temporal rules, and should be checked against CANON 4's lag note (C4.4n2) and Q-007.
+- WQ-03: how work done or not done affects backlog, physical state, future loads or recovery: a state-transition proposal.
+- WQ-04: under which evidence standards a work quantity may become a level the governor senses; sensing would take the producing part's own access (C3.1b).
+- WQ-05: which mapping decisions need higher-confidence documentary evidence in paid organisational diagnostics.
+- WQ-06: widening the reference-output rule family beyond non-negative, non-decreasing forms (decision 6).
+- WQ-07: the deprecation of `Part.capacity` and `Part.efficiency` (decision 7), kept in schema 0.4.0.
+
+## P-LOAD-02: carryable obligations, tracking only (approved 2026-10-20)
+
+**Source:** "Nought_Engine_P-LOAD-02_Tracking_Only_Implementation_Handoff_v0.1_APPROVED.md", approved by James on 2026-10-20, after the read-only review of the Q-028 and P-LOAD-02 design ([dynamic-arrangements-review.md](dynamic-arrangements-review.md)). The rulings are in [decisions.md](decisions.md) (P-LOAD-02). An optional, application-level proposal: not CANON, and not an eighth component.
+
+**Why a proposal:** CANON has no backlog. P-WORK-01's work not done is a difference within one step, not a stock. The ledger counts eligible, carryable obligations from declared inputs and modelled work: a modelled quantity, never an observed count.
+
+**Where it runs:** only in `runBacklog(model, scenario, workAttachment, backlogAttachment, options)`, which validates and calls `runWork` once, or in the pure `backlogFromTraces(baseTrace, workTrace, attachment, digest)` (src/proposals/backlog/). `run()` and `runWork()` never compute it, a scenario cannot enable it, and nothing it computes reaches a load, a requirement, a reference output, a draw, a unit count, P-LOAD-01 or a level.
+
+**The attachment** (a separate document; examples in fixtures/backlog/): its version and id; the model by id and exact digest, and the work attachment by id, version and exact digest, so one mapping serves every scenario of that model; the opt-in (`P-LOAD-02` at 0.1); and per part and work at most one account:
+- an obligation unit, exactly the work's unit (no conversion);
+- `indivisible` or `divisible`, stated; an indivisible account takes whole counts only;
+- the eligibility claim (what an eligible, unfinished obligation is, why it carries, the boundary), the one-to-one closure claim (`oneToOne: true`: one unit of actual output is one completed eligible obligation) and the zero-withdrawal claim (`zeroEveryStep: true`, the only withdrawal allowed);
+- the opening balance (before step 0's admissions) and the new admissions per step (an entry holds until the next; never earlier backlog), each may be a gap;
+- an evidence label on each of these five claims: `documented`, `estimated`, `assumed` or `unknown`, with its source.
+
+**The ledger** (per account p and step t, in the obligation unit):
+- B_t: the opening balance; D_t = B_t + N_t, the eligible obligations;
+- R_t, O_t: the work record's reference and actual output, unchanged;
+- C_t = O_t, only where every guard holds; W_t = 0, as asserted;
+- B_{t+1} = D_t - C_t - W_t, so that B_t + N_t = C_t + W_t + B_{t+1}, exactly.
+
+**Guards:** the eligibility, closure and withdrawal claims are not unknown; D_t, R_t and O_t are known; R_t <= D_t (R_t below D_t is fine); not D_t = 0 with O_t above 0; and, for an indivisible account, O_t is a whole number. A failed guard refuses C_t and B_{t+1}; nothing is clamped, rounded or invented. There is no known-zero rule in the ledger: an output of 0 never stands in for an unknown balance or claim. A refused balance refuses every later balance of the account, with no restart from an observed count; later admissions and the work's values stay known, and other accounts are unaffected.
+
+**Evidence:** an assumed or estimated claim makes every result of its account conditional, listed on each record (`conditionalOn`) and in the stamp. An unknown claim refuses what depends on it: an unknown eligibility, closure or withdrawal claim refuses completions and so the balance; an unknown opening balance or admissions claim refuses that count.
+
+**Trace:** a separate `BacklogTrace`, bound to the base and work traces by their hashes, and to the model, work attachment and backlog attachment by their digests, with the CANON fingerprint copied from the base run. Each record carries its diagnostics: a refusal inherited from the work trace, a missing or unknown ledger input, a closure guard, a fractional closure of indivisible obligations, conditional evidence. Refusal ids it creates start `backlog/` and name P-LOAD-02; ids from the work trace are kept.
+
+**Fixtures:** `two-step-casework` (a model, scenario, work and backlog attachment that reproduce acceptance test T01; `npm run example:backlog` prints its ledger) and `organisation-obligations` over the organisation model and the availability work (numbers hypothetical, every claim assumed). Golden backlog hashes are in tests/golden/backlog-hashes.json (`npm run golden:backlog`).
+
+**Not in this release:** feedback from the backlog into any load or later step (WQ-03; a coupled mode would need a step function, a generated-load source and its own approval); withdrawals other than 0; expiry, ageing, priority, partial completion; a restart from an observed count; more than one account per part and work. P-LOAD-01's backlog dial stays dormant: P-LOAD-02 never reads it.
+
+## PROP-SENSE-01: the sending dial (decision Q-004)
+
+James's ruling (2026-10-20): each level gets a mapping dial for what its producing part sends when short, either "keeps sending", or "stops once the part's shortfall exceeds a stated amount", recorded as never sent. With no dial set, refuse that level rather than guess.
+
+- **Schema:** `whenProducerShort` on a level: `{ "kind": "keeps-sending" }` or `{ "kind": "stops-when-short", "above": [{ "resource", "amount" }] }`. Optional, or an explicit gap.
+- **Stopping dial:** it states an amount for every resource the producing part requires (validation rejects a missing or extra resource). It stops the level when any of the part's shortfalls in the step before exceeds its amount (strictly), recorded as "never sent" with the mapping as its basis.
+- **When it applies:** when the producing part was short in the step before (PROP-STEP-01 timing), or when its units are unknown only because of an earlier shortfall (Q-016). In both cases, "keeps sending" sends the measured value, and a part known to have no units still sends nothing.
+- **No dial:** in exactly those cases, the level is refused (unknown prerequisite, Q-004). While the producing part has not been short, no dial is needed.
+- **Fixtures:**
+  - organisation: the reserve-balance report stops above 2 of money or 5 hours; the caseload report keeps sending;
+  - organism: glycogen content keeps sending; the intake reading stops above 10.
+- **In force:** listed in the stamp whenever any level sets a dial.
+
+## P-IPF-01 to P-IPF-06 (disabled)
+
+The IPF proposals of the Unified Core Spec catalogue. Their definitions are not in this repository and nothing implements them. The ids are reserved and disabled: a run given any of them stops at initialisation with a ConfigurationError. The draft IPF types (src/draft/) carry no behaviour.
+
+## PROP-STEP-01: step sequence, the timing of sensing, interventions before switches
+
+**Why:** a step loop must evaluate things in some order. CANON's dependencies fix most of it (access is given by a setting from a sensed level, C3.6b; realised flow follows access, C2.5n; shortfall follows what is received, C3.4c). These choices are not fixed by CANON (Q-005):
+- **What sensing reads:** the true state as at the start of the step (store content after the step before, loads applied this step; for "received", "entering" and "inflow" measures, the step before, with scenario readings at step 0). This is also what keeps the governor free of look-ahead (alignment item 9).
+- **When a producing part's shortfall matters:** sensing work for the reading used in step t belongs to step t-1. If the producing part was short in step t-1, its sending dial (PROP-SENSE-01, decision Q-004) says what it sends; with no dial the reading is refused. This avoids a circularity (the reading sets access, which decides whether the producer goes short in the same step) and matches CANON 4's own step language ("went short in the step before").
+- **Interventions before switches:** where an intervention changes the arrangement in a step, threshold switches are not evaluated in that step; they resume from the next step. Without this, an intervention restoring a declared mode after an unmapped transition could be undone in the same step by a switch reading the earlier unknown reading, and the arrangement would stay unknown for good. It also means an intervention and a switch never contend in one step (which would itself be unmapped).
+
+**Sequence:** events (damage, interventions, signal conditions, in the order the scenario lists them); sensing; threshold switches, unless an intervention changed the arrangement (then delivery is recomputed under the new mode's held levels); settings, route capacities and store rules; requirement and upkeep; the recorded order; the draw per resource; accounting, the reconciliation, CANON 1's ledger and flags. A threshold switch needs a reading in the step before and in this step, so none can cross at step 0.
+
+**Also here:** units change only where CANON names a cause (shortfall, damage, rebuilding). Damage is refused (Q-015); shortfall and rebuilding are refused (Q-016) unless the run enables P-LOAD-01 and the part has its dials. So without P-LOAD-01 a part's unit count is carried unchanged only through steps in which it was not short and not damaged.
+
+## PROP-FLOW-01: only stores hold resource from one step to the next
+
+**Why:** what enters the shared flow and is neither received nor stored (the unused amount) has to go somewhere in the next step's accounting. Components are roles (C3.2) and holding resource is the store's role (C2.6), so anything that holds resource across steps is a store and must be mapped as one. The unused amount is therefore reported and not carried. Since 0.2.0 each resource also states whether it can be held across steps at all (alignment item 5), and only a storable resource can have a store. This is close to a derivation but is listed so James can confirm it (Q-019).
+
+## PROP-RANK-01: position within a layer as documented at mapping
+
+**Why:** CANON 4 says rank within a layer "comes from access and, where access is built in, from requirement" (C4.3b), but gives no rule for computing a position from them (Q-006). APPLICATION.md (Applying CANON 4) says "Rank within a layer comes from access as documented at mapping". The engine takes the position declared on the part (or on the mode) and never derives one. Layers themselves are derived from dependencies (C4.3a). A part with no dependency path to the top sits in the bottom layer, the deepest layer reached from the top and at least layer 1 (decision Q-017); the trace flags it (`unreached-part-kept-access`) in a step where it receives its full committed draw with its access not lowered while a part ranked above it is cut (receives less than its committed draw, or has its access lowered). Where a built-in part's requirement changes, the place may move by CANON 3 (C3.7), so the recorded order is refused from that step until the next snapshot; the top is excluded because it never changes within a boundary (C4.4a). The declared order is also what tells a mode change from an arrangement revision (alignment item 7).
+
+## PROP-ROUTE-01: route capacity as a rule; no route, no network cap
+
+**Why:** CANON 2 says the routes can hold realised flow below access (C2.5n) but not how a route's capacity is given. A route carries a capacity rule of the same declarative kind as a setting (constant, step or piecewise-linear on a sensed level), governor-set or built-in (C3.6a: access is set by the governor "or built into the part or route"). Routes run from the one shared flow of their resource to parts only (decision Q-010): store releases and outside input enter the shared flow, and a ring-fenced allocation is a built-in access setting on the receiving part, not a route. A part with no declared route has no network cap ("use the fewest components that do the job", APPLICATION 5). Whether a route's capacity rule is a setting, and whether changing it is a mode change, is Q-021. This phase computes one route per part per resource (an engineering limit; a second route is rejected).
+
+## PROP-STORE-01: store release and fill limits as rules
+
+**Why:** CANON says stores "hold resource and release it" (C2.6) and that the governor's regulation works through stores (C3.8n), but not how much is released or what fills a store (Q-003). Each store declares a release rule and a fill-limit rule on sensed levels (governor-set or built-in). Release is bounded by content (physical, not the governor reading the true state); fill by the fill limit and the room left after this step's release; the fill itself comes from the allocation policy.
+
+## PROP-SILENCE-01: a rule states its response to silence read as alarm
+
+**Why:** a missing signal never produces a value (alignment item 2). Each level states how its silence is read: `no-intervention` or `alarm` (the 0.1.0 reading `normal` is now `no-intervention`). A rule that reads a silent level:
+- **read as no intervention:** the governor does not act, so the value the rule gave in the step before stands. With no earlier value (step 0) it is refused as an unknown prerequisite. A rule cannot state a value for this case. Formalising "does not act" as "the earlier value stands" is Q-029.
+- **read as alarm:** the rule's stated response (`whenSilent.alarm`) applies, or it is refused as an unknown prerequisite.
+- **a built-in rule:** refused as an unsupported rule (Q-012).
+
+No delivered value, healthy reading or zero is ever recorded for a silent level, and its true value and every shortfall are still recorded. A threshold switch on a silent level read as no intervention does not cross; read as alarm, the transition is unmapped and refused (Q-013).
+
+## APP-04: a scenario is a load applied to a system (APPLICATION 5)
+
+A scenario document that declares components (parts, stores, routes and so on) is rejected with code `scenario-not-system`. It can only supply series, initial content, readings and events.
+
+## APP-08: a top short while another part is not (APPLICATION, Applying CANON 4)
+
+APPLICATION says a mapped top sacrificed before another part counts against the model. CANON does not define "sacrificed" operationally (C4.1b), so the engine only flags a step where the top is short of the protected resource while another part is not, and says whether a support part was short in the step before (the case CANON 4's lag note describes). The flag never changes a result.
+
+## Proposed, not implemented
+
+Validation checks drawn from APPLICATION.md that could be added later, each as a labelled proposal:
+- **Resource named, not carrier or route** (APPLICATION 5): a resource id that equals a store's or route's id is suspicious. Weak; not added.
+- **Requirement rule fixed in advance** (Applying CANON 3): already structural, since no scenario event can change a requirement rule.
+- **Capacity versus shortfall** (Applying CANON 3): "A part limited by its capacity, not its access, has no shortfall". Capacity now has a home at the level of work (P-WORK-01, approved 2026-10-20): it limits work done, never requirement or shortfall, and what a capacity-limited part does not do is reported as work not done. `Part.capacity` and `Part.efficiency` stay unread (decision 7).
+- **Lags count only if observed** (Applying CANON 7): the trace tags every value computed or sensed, so a later analysis can separate observed from unobserved shortfall. No check yet.
+
+## Engineering conventions (not model rules)
+
+Listed for completeness; none of these changes what a model means.
+- **Refusals, not exceptions:** a calculation the engine cannot make is a typed refusal in the result, with one of seven stable categories (unknown prerequisite, invalid resource topology, unsupported rule, unspecified allocation policy, scarcity precondition not met, invalid settings change, unmapped transition). Exceptions are kept for a model, scenario or configuration that cannot be initialised, and for the engine's own invariant failures.
+- **Exact rational arithmetic** on BigInt for every quantity: the identities hold exactly, and no rounding rule (which would allocate leftover units) is ever needed.
+- **Scenario series** hold each value from its step until the next entry, and every series starts at step 0. A missing series is an error, never zero.
+- **Linear tables** are not extrapolated: a reading outside the declared range is refused.
+- **Undeclared means absent, not zero, except by explicit statement:** a setting for a resource the part has no requirement for is rejected; write requirement 0. A part with no upkeep stated has no upkeep/work split in the trace (decision Q-023 applies where upkeep is stated).
+- **Mapped outflows** are always empty in this schema, so the reconciliation's outflow total is the sum over none (Q-027).
+- **Deterministic order:** every list in a trace is sorted by id (code-unit order); scenario events apply in the order listed.
