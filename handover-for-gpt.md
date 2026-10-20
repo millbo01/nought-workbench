@@ -895,7 +895,15 @@ export interface ScenarioValidation extends ValidationReport {
 /** Parse and validate a model document. `ok` is false if any issue is an error. */
 export declare function validateModel(doc: unknown): ModelValidation;
 /** Parse and validate a scenario document against a valid model. */
-export declare function validateScenario(doc: unknown, model: T.Model, suppliedLoads?: ReadonlySet<string>): ScenarioValidation;
+export declare function validateScenario(doc: unknown, model: T.Model): ScenarioValidation;
+/**
+ * Validate a scenario for a coupled run (internal: not on the package entry
+ * point; P-COUPLE-01, CF-D09). The loads a coupling supplies, keyed
+ * 'part|load', must have no series; every other declared load needs exactly
+ * one. A scenario that lacks a supplied load's series stays invalid for
+ * validateScenario and run().
+ */
+export declare function validateCoupledScenario(doc: unknown, model: T.Model, suppliedLoads: ReadonlySet<string>): ScenarioValidation;
 ```
 
 ### src/core/errors.ts

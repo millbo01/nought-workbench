@@ -688,12 +688,25 @@ export function validateModel(doc) {
     const ok = !issues.some((i) => i.severity === 'error');
     return { ok, issues, model: ok ? parsed.model : undefined };
 }
-/** Parse and validate a scenario document against a valid model. */
-export function validateScenario(doc, model, suppliedLoads) {
+function scenarioValidation(doc, model, suppliedLoads) {
     const parsed = parseScenario(doc);
     if (!parsed.scenario)
         return { ok: false, issues: parsed.issues };
     const issues = [...parsed.issues, ...validateScenarioAgainst(model, parsed.scenario, suppliedLoads)];
     const ok = !issues.some((i) => i.severity === 'error');
     return { ok, issues, scenario: ok ? parsed.scenario : undefined };
+}
+/** Parse and validate a scenario document against a valid model. */
+export function validateScenario(doc, model) {
+    return scenarioValidation(doc, model, new Set());
+}
+/**
+ * Validate a scenario for a coupled run (internal: not on the package entry
+ * point; P-COUPLE-01, CF-D09). The loads a coupling supplies, keyed
+ * 'part|load', must have no series; every other declared load needs exactly
+ * one. A scenario that lacks a supplied load's series stays invalid for
+ * validateScenario and run().
+ */
+export function validateCoupledScenario(doc, model, suppliedLoads) {
+    return scenarioValidation(doc, model, suppliedLoads);
 }
