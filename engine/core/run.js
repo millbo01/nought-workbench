@@ -116,6 +116,14 @@ export function run(modelDoc, scenarioDoc, options = {}) {
     const sv = validateScenario(scenarioDoc, mv.model);
     if (!sv.ok || !sv.scenario)
         throw new ModelInvalidError('scenario', sv.issues);
+    checkDrawPolicy(options);
+    return runValidated(mv.model, sv.scenario, options, {
+        model: sha256OfString(canonicalJson(modelDoc)),
+        scenario: sha256OfString(canonicalJson(scenarioDoc)),
+    });
+}
+/** Throws ConfigurationError for an allocation policy that may not be one: a disabled proposal, or one a scenario enables. */
+export function checkDrawPolicy(options) {
     const pid = options.drawPolicy?.proposalId;
     if (pid !== undefined && DISABLED_PROPOSALS.includes(pid)) {
         throw new ConfigurationError(`${pid} is disabled in this engine and cannot be used as the allocation policy`);
@@ -123,10 +131,6 @@ export function run(modelDoc, scenarioDoc, options = {}) {
     if (pid !== undefined && SCENARIO_PROPOSALS.includes(pid)) {
         throw new ConfigurationError(`${pid} is not an allocation policy: a scenario enables it with "enable": ["${pid}"]`);
     }
-    return runValidated(mv.model, sv.scenario, options, {
-        model: sha256OfString(canonicalJson(modelDoc)),
-        scenario: sha256OfString(canonicalJson(scenarioDoc)),
-    });
 }
 export function startRun(model, scenario, options, hashes) {
     const policy = options.drawPolicy ?? null;
@@ -1071,11 +1075,12 @@ export function startRun(model, scenario, options, hashes) {
         });
         const order = orderV.ok ? { entries: orderV.v } : { refused: notes.note(orderV.refusals, t) };
         flags.sort((a, b) => byId(a.code, b.code) || byId(a.subject, b.subject) || byId(a.detail, b.detail));
-        steps.push({
+        const stepRecord = {
             step: t, mode: mode?.id ?? null, snapshot: snapshots.length, order, levels: levelRecords, parts: partRecords,
             resources: resourceRecords, stores: storeRecords, units: unitRecords, protectedFlow: pfRecord,
             indicators: indicatorRecords, flags,
-        });
+        };
+        steps.push(stepRecord);
         // ---------------------------------------------------------------- carry to the next step
         prevReceived = received;
         prevEntering = enteringV;
@@ -1090,6 +1095,7 @@ export function startRun(model, scenario, options, hashes) {
         storeContent = nextContent;
         units = nextUnits;
         lostOutstanding = nextLost;
+        return stepRecord;
     };
     const finish = (finishOptions) => {
         if (nextStep !== scenario.steps)

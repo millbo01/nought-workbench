@@ -179,8 +179,9 @@ export function startBacklog(attachment, attachmentSha256, stepCount, sources) {
                     for (const x of v.refusals)
                         ids.add(x.id);
             const diagnostics = new Set();
+            // The ledger's own refusals first: in a coupled run they come back to it through the generated load (P-COUPLE-01).
             for (const id of ids)
-                diagnostics.add(sources.describe(id) !== undefined ? 'inherited-work-refusal' : (kinds.get(id) ?? 'unknown-ledger-input'));
+                diagnostics.add(kinds.get(id) ?? (sources.describe(id) !== undefined ? 'inherited-work-refusal' : 'unknown-ledger-input'));
             if (l.conditionalOn.length > 0)
                 diagnostics.add('conditional-evidence');
             return {

@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-20
 **Repository:** millbo01/nought-engine (engine and schema 0.4.0; 229 tests passing, the 202-test baseline among them; every historic golden hash unchanged).
-**Status:** the scope is confirmed against "Nought_Engine_Coupled_Feedback_Review_Resolutions_v0.3_APPROVED.md" (rulings CF-D01 to CF-D10 and scope confirmations F.1 to F.5; docs/decisions.md). **Not implemented:** the coordinator, its attachment and its trace wait for the express authorisation of that document's third gate. Nothing below adds a causal rule.
+**Status:** the scope is confirmed against "Nought_Engine_Coupled_Feedback_Review_Resolutions_v0.3_APPROVED.md" (rulings CF-D01 to CF-D10 and scope confirmations F.1 to F.5; docs/decisions.md). **Implemented, 2026-10-20:** James gave the authorisation, the gate confirmation and the API decision listed at the end, and P-COUPLE-01 0.1 was built within this scope (commits bc82c3c and a943598; docs/proposals.md, P-COUPLE-01; the implementation choices are in docs/decisions.md). Nothing below adds a causal rule.
 
 ## Already in place (each step left every existing result unchanged)
 
@@ -79,7 +79,7 @@ C_t never changes step t. A refused B_{t+1} refuses every later G of that bindin
 
 Partial, blocked or scheduled obligations; ageing, expiry, withdrawals; cross-account or cross-part bindings; prioritisation; damage or degradation; inferred demand; any extra resource draw for work; delayed sensing of a backlog load; Q-028; any CANON or APPLICATION change; IPF.
 
-## Needed before implementation
+## Needed before implementation (all given by James, 2026-10-20)
 
 1. **Express authorisation** for the P-COUPLE-01 coordinator, attachment, derived-scenario provenance, run stamps and coupling trace (the v0.3 document's third gate).
 2. **Confirmation that the four preparations satisfy its second gate.** They were made under the instruction of 2026-10-20 to proceed in staged, test-preserving increments, and they pass all its halts once the validator correction is in.

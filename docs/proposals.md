@@ -2,7 +2,7 @@
 
 Every rule, default or convention in the engine that is not CANON, with the reason it is there. None of these is theory; each can be withdrawn or replaced by James. James's rulings on open questions are in [decisions.md](decisions.md); where a ruling is carried out by mapping data or a core check, it is named below. A run lists every proposal in force in its stamp (`stamp.proposals`), so no result can be read as canonical while a proposal shaped it.
 
-**Ids.** P-ALLOC-01, P-LOAD-01 and P-IPF-01 to P-IPF-06 are the ids of the Unified Core Spec v0.2 catalogue (engine 0.2.0, 2026-10-20). P-WORK-01 and P-DEP-01 are the Functional Work and Dependencies Contract's (2026-10-20); P-LOAD-02 is the tracking-only backlog handoff's (2026-10-20). PROP- ids are the engine's own, kept until they can be matched to that catalogue (Q-030).
+**Ids.** P-ALLOC-01, P-LOAD-01 and P-IPF-01 to P-IPF-06 are the ids of the Unified Core Spec v0.2 catalogue (engine 0.2.0, 2026-10-20). P-WORK-01 and P-DEP-01 are the Functional Work and Dependencies Contract's (2026-10-20); P-LOAD-02 is the tracking-only backlog handoff's (2026-10-20); P-COUPLE-01 is the coupled-feedback v0.3 design resolutions' (2026-10-20). PROP- ids are the engine's own, kept until they can be matched to that catalogue (Q-030).
 
 Kinds:
 - **Policy:** passed in explicitly; the core never uses it by default.
@@ -10,6 +10,7 @@ Kinds:
 - **Check:** a flag or validation drawn from APPLICATION.md, labelled as a proposal, never an error that CANON would not give.
 - **Work extension:** computed only by `runWork`, after and apart from the base run, for a work attachment that enables it; the base run never sees it.
 - **Tracking extension:** computed only by `runBacklog` or `backlogFromTraces`, from finished base and work traces, and never fed back into a run.
+- **Coupling extension:** computed only by `runCoupled`, which takes the base run, the work and the ledger one step at a time and gives an account's eligible obligations to one load; never in `run()`, `runWork()` or `runBacklog()`.
 - **Disabled:** registered so its id is reserved, and refused if anyone tries to use it.
 
 | ID | Kind | In force | Summary |
@@ -19,6 +20,7 @@ Kinds:
 | P-WORK-01 | work extension | only in runWork, for an attachment that enables it | Useful work from a part's own resources: reference output, recipe, capacity, yield, work not done (approved as optional 2026-10-20) |
 | P-DEP-01 | work extension | only in runWork, for an attachment that maps links | A same-step, non-exclusive functional cap on an existing dependency (approved as optional 2026-10-20) |
 | P-LOAD-02 | tracking extension | only in runBacklog, for a backlog attachment that enables it | Carryable obligations, tracking only: a ledger of eligible obligations from a finished run and its work, with no feedback (approved 2026-10-20) |
+| P-COUPLE-01 | coupling extension | only in runCoupled, for a coupling attachment that enables it | Coupled backlog feedback: an account's eligible obligations generate one load on its own part, step by step (v0.3 design resolutions approved; implementation authorised 2026-10-20) |
 | P-IPF-01 to P-IPF-06 | disabled | never | The IPF proposals of the Unified Core Spec catalogue; not defined in this repository |
 | PROP-STEP-01 | core loop | every run | Step sequence, the timing of sensing, interventions before switches |
 | PROP-FLOW-01 | core loop | every run | Only stores hold resource from one step to the next |
@@ -169,7 +171,57 @@ Logged in [open-questions.md](open-questions.md) and set out with options in the
 
 **Fixtures:** `two-step-casework` (a model, scenario, work and backlog attachment that reproduce acceptance test T01; `npm run example:backlog` prints its ledger) and `organisation-obligations` over the organisation model and the availability work (numbers hypothetical, every claim assumed). Golden backlog hashes are in tests/golden/backlog-hashes.json (`npm run golden:backlog`).
 
-**Not in this release:** feedback from the backlog into any load or later step (WQ-03; a coupled mode would need a step function, a generated-load source and its own approval); withdrawals other than 0; expiry, ageing, priority, partial completion; a restart from an observed count; more than one account per part and work. P-LOAD-01's backlog dial stays dormant: P-LOAD-02 never reads it.
+**Not in this release:** feedback from the backlog into any load or later step; that is P-COUPLE-01's, on its own entry point (below), and P-LOAD-02 itself stays tracking only (CF-D01). Also: withdrawals other than 0; expiry, ageing, priority, partial completion; a restart from an observed count; more than one account per part and work. P-LOAD-01's backlog dial stays dormant: P-LOAD-02 never reads it.
+
+## P-COUPLE-01: coupled backlog feedback (v0.3 resolutions approved; implementation authorised 2026-10-20)
+
+**Source:** "Nought_Engine_Coupled_Feedback_Review_Resolutions_v0.3_APPROVED.md" (rulings CF-D01 to CF-D10, scope confirmations F.1 to F.5), with the v0.2 coupled-feedback handoff and its review ([coupled-feedback-review.md](coupled-feedback-review.md)). The scope as confirmed is [p-couple-01-scope.md](p-couple-01-scope.md), and James's authorisation of 2026-10-20 is in [decisions.md](decisions.md). An optional proposal, at contract version 0.1: not CANON, and no new law.
+
+**Why a proposal:** CANON has no backlog, and P-LOAD-02 only tracks one. The approved active-workload rule says when a ledger's eligible obligations may stand for a load: when the account's whole eligible balance is substantiated as active workload of that load. The existing requirement rule then turns the load into a resource requirement, as it turns any load.
+
+**Where it runs:** only in `runCoupled(model, scenario, workAttachment, backlogAttachment, couplingAttachment, options)` (src/proposals/couple/). `run()`, `runWork()` and `runBacklog()` never couple, and a scenario cannot enable it.
+
+**The attachment** (a separate document; examples in fixtures/couple/) holds:
+- its version and id;
+- the model by id and exact digest, and the backlog attachment by id, version and exact digest (which binds its work attachment in turn);
+- the opt-in (`P-COUPLE-01` at 0.1);
+- one or more bindings, each naming an account, the account's own part, and a load that part declares in exactly the account's obligation unit, with the active-workload claim (a statement and its evidence label). The claim holds in every step of the run (F.2).
+
+A load has one source, and an account generates one load (CF-D02).
+
+**Validation** rejects these before anything is computed, with no fallback to the scenario's loads (F.4):
+- a cross-part binding, an undeclared load or a unit mismatch;
+- a load or an account bound twice;
+- an unknown active-workload claim (CF-D03);
+- a scenario that also gives a bound load a series.
+
+It flags these without rejecting them:
+- an assumed or estimated claim: a conditional simulation (CF-D03);
+- a reference-output rule not of the proven form R = b x G with b <= 1 (CF-D07); the ledger's runtime guard R_t <= D_t decides;
+- what reads each bound load: the preflight impact diagnostic (CF-D06);
+- a level measuring a bound load (CF-D10).
+
+**The coupled run**, for each step t and each binding:
+1. G_t = D_t = B_t + N_t (G_0 = B_0 + N_0, F.3);
+2. one PAM step with G_t given for the bound load;
+3. one work step reading it;
+4. one ledger closure, giving B_{t+1} and so G_{t+1}.
+
+Nothing else is added. A level's reading of G_t is tagged `computed`, and what it sends and delivers follows its producing part and route (CF-D04, CF-D10). A refused G refuses what the mapped rules make depend on it, and nothing else. A refused balance refuses every later G of its binding, with no restart (CF-D06).
+
+**Records:**
+- The base trace's stamp names P-COUPLE-01 (CF-D04).
+- The work and backlog traces are as their runners make them.
+- A coupling trace of its own is always delivered with them. It carries G_t per step; each binding's claim, evidence, conditions, static guard and impact; the base, work and backlog trace hashes; the refusal path of every refusal behind a refused G; and the digest of the replay scenario, labelled derived (CF-D05).
+- `couplingReplayScenario` gives that scenario. The unchanged `runBacklog` on it gives the same known figures and refuses the same fields.
+
+**Fixtures:**
+- `two-step-coupled`: acceptance check CF-R03. `npm run example:coupled` prints it with its evidence and conditions.
+- `organisation-caseload-unit-loss`: the organisation model with P-LOAD-01 enabled. Its service caseload is generated from an account of open service cases, and sensed by a level that finance produces.
+
+Golden hashes of all four traces are in tests/golden/couple-hashes.json (`npm run golden:couple`).
+
+**Not in this release:** partial, blocked or scheduled obligations; ageing, expiry, withdrawals; cross-account or cross-part bindings; prioritisation; damage or degradation; inferred demand; any extra resource draw for work; delayed sensing of a generated load; Q-028; IPF.
 
 ## PROP-SENSE-01: the sending dial (decision Q-004)
 

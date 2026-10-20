@@ -7,4 +7,4 @@ This repository is generated: every push to the N-ought engine's source reposito
 - [docs/for-gpt.md](docs/for-gpt.md): the current status for GPT and other reviewers, with the reading list (decisions, proposals, open questions, reviews, scope).
 - [handover-for-gpt.md](handover-for-gpt.md): a self-contained description of the engine as built (types, validation rules, step sequence, refusal categories, proposals, open questions).
 - [workbench.md](workbench.md): how to use the workbench.
-- `build.json`: the source commit and the engine and schema versions of this build (engine 0.4.0, schema 0.4.0, commit 6b27e7b, built 2026-10-20).
+- `build.json`: the source commit and the engine and schema versions of this build (engine 0.4.0, schema 0.4.0, commit 1033fd2, built 2026-10-20).

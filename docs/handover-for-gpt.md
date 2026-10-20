@@ -1,6 +1,6 @@
 # Nought Engine: handover
 
-A self-contained description of the Nought Engine as built, for a model that has not seen the repository. It reflects engine 0.4.0 and schema 0.4.0 (2026-10-20), after James's answers to the first open questions, his approval of P-LOAD-01's form, the 0.4.0 migration (docs/decisions.md, decision 12: the versions, and loads required to be non-negative), the optional work extension P-WORK-01 and P-DEP-01 (approved 2026-10-20 as optional modelling proposals, not CANON), and the tracking-only backlog ledger P-LOAD-02 (approved 2026-10-20, an optional proposal).
+A self-contained description of the Nought Engine as built, for a model that has not seen the repository. It reflects engine 0.4.0 and schema 0.4.0 (2026-10-20), after James's answers to the first open questions, his approval of P-LOAD-01's form, the 0.4.0 migration (docs/decisions.md, decision 12: the versions, and loads required to be non-negative), the optional work extension P-WORK-01 and P-DEP-01 (approved 2026-10-20 as optional modelling proposals, not CANON), the tracking-only backlog ledger P-LOAD-02 (approved 2026-10-20, an optional proposal), and the coupled backlog feedback P-COUPLE-01 0.1 (the v0.3 design resolutions, approved, and its implementation authorised 2026-10-20; an optional proposal, on its own entry point `runCoupled`).
 
 **Ground rules:**
 - The specification is CANON.md (SHA-256 `dd3a6ccaa20db6760364320617447824794134190249d1e974ea126fde351266`). It wins over this file and over everything in the code.
@@ -812,7 +812,7 @@ import type { DrawPolicy } from './draw.ts';
 import type { Rational } from './rational.ts';
 import type { Refusal, V } from './refusal.ts';
 import type * as T from './schema/types.ts';
-import type { RunTrace } from './trace.ts';
+import type { RunTrace, StepRecord } from './trace.ts';
 export interface RunOptions {
     /** The allocation policy. The core has none (Q-001): without one, every draw is refused and everything else is computed. */
     readonly drawPolicy?: DrawPolicy | undefined;
@@ -823,8 +823,8 @@ export interface RunOptions {
  * taking the steps through it computes exactly what run() computes.
  */
 export interface RunCursor {
-    /** Compute step t. Steps are taken in order from 0, each once. */
-    step(t: number, inputs?: StepInputs): void;
+    /** Compute step t and return its record. Steps are taken in order from 0, each once. */
+    step(t: number, inputs?: StepInputs): StepRecord;
     /** Close the last snapshot and return the trace, once every step is taken. */
     finish(options?: FinishOptions): RunTrace;
     /** The refusal behind an id a value carries, once it has been noted. */
@@ -856,6 +856,8 @@ export declare const SCENARIO_PROPOSALS: readonly ["P-LOAD-01"];
  * disabled proposal. Every calculation it cannot make is refused in the result.
  */
 export declare function run(modelDoc: unknown, scenarioDoc: unknown, options?: RunOptions): RunTrace;
+/** Throws ConfigurationError for an allocation policy that may not be one: a disabled proposal, or one a scenario enables. */
+export declare function checkDrawPolicy(options: RunOptions): void;
 export declare function startRun(model: T.Model, scenario: T.Scenario, options: RunOptions, hashes: {
     model: string;
     scenario: string;
@@ -1095,6 +1097,11 @@ export type { BacklogAccount, BacklogAttachment, BacklogValidation, Divisibility
 export { backlogFromTraces, runBacklog } from './backlog/ledger.ts';
 export { BACKLOG_VERSION, backlogTraceHash } from './backlog/trace.ts';
 export type { BacklogAccountStamp, BacklogDiagnostic, BacklogRecord, BacklogRunStamp, BacklogStepRecord, BacklogTrace } from './backlog/trace.ts';
+export { checkCouplingAttachment, conditionsOf, COUPLING_ATTACHMENT_VERSION, COUPLING_PROPOSAL, couplingImpact, parseCouplingAttachment, staticGuard, validateCouplingAttachment } from './couple/attachment.ts';
+export type { BindingImpact, CouplingAttachment, CouplingBinding, CouplingValidation, GuardStatus } from './couple/attachment.ts';
+export { couplingReplayScenario, runCoupled } from './couple/run-coupled.ts';
+export { COUPLE_VERSION, couplingTraceHash } from './couple/trace.ts';
+export type { CouplingBindingStamp, CouplingRecord, CouplingRunStamp, CouplingStepRecord, CouplingTrace, RefusalPath, RefusalPathEntry } from './couple/trace.ts';
 export { checkWorkAttachment, parseWorkAttachment, validateWorkAttachment, WORK_ATTACHMENT_VERSION, WORK_PROPOSALS } from './work/attachment.ts';
 export type { CapacityRule, FunctionalLink, LinkSemantics, RecipeEntry, WorkAttachment, WorkMapping, WorkValidation } from './work/attachment.ts';
 export { runWork, workFromTrace } from './work/run-work.ts';
@@ -1103,7 +1110,7 @@ export type { BindingRecord, FunctionalLinkRecord, WorkRecord, WorkResourceRecor
 export interface ProposalEntry {
     readonly id: string;
     readonly title: string;
-    readonly where: 'core loop' | 'schema' | 'policy' | 'check' | 'work extension' | 'tracking extension';
+    readonly where: 'core loop' | 'schema' | 'policy' | 'check' | 'work extension' | 'tracking extension' | 'coupling extension';
     /** Whether this engine can run it at all. Disabled proposals cannot be enabled. */
     readonly enabled: boolean;
     readonly inForce: string;
@@ -1647,6 +1654,274 @@ export declare function runBacklog(modelDoc: unknown, scenarioDoc: unknown, work
 };
 ```
 
+### src/proposals/couple/attachment.ts
+
+```ts
+import type { Issue } from '../../core/errors.ts';
+import type * as T from '../../core/schema/types.ts';
+import type { BacklogAccount, BacklogAttachment, Evidence } from '../backlog/attachment.ts';
+import type { WorkAttachment } from '../work/attachment.ts';
+export declare const COUPLING_ATTACHMENT_VERSION = "0.1.0";
+/** The proposal a coupling attachment enables, at the contract version this engine computes (CF-D01). */
+export declare const COUPLING_PROPOSAL: {
+    readonly id: "P-COUPLE-01";
+    readonly version: "0.1";
+};
+export interface CouplingBinding extends T.Annotated {
+    readonly binding: T.Id;
+    readonly account: T.Id;
+    /** The account's own part (CF-D02). */
+    readonly part: T.Id;
+    /** A load the part declares, in exactly the account's obligation unit (CF-D02). */
+    readonly load: T.Id;
+    /** That the account's whole eligible balance is active workload of the load, in every step of the run (F.2). */
+    readonly activeWorkload: {
+        readonly statement: string;
+        readonly evidence: Evidence;
+    };
+}
+export interface CouplingAttachment extends T.Annotated {
+    readonly attachmentVersion: string;
+    readonly id: T.Id;
+    /** The model's id and the exact digest the bindings were mapped against (RunStamp.mapping). */
+    readonly model: T.Id;
+    readonly modelSha256: string;
+    /** The backlog attachment whose accounts are bound, by id, version and exact digest (BacklogRunStamp.attachment). */
+    readonly backlogAttachment: {
+        readonly id: T.Id;
+        readonly version: string;
+        readonly sha256: string;
+    };
+    /** The opt-in: P-COUPLE-01 at its version. */
+    readonly proposals: readonly {
+        readonly id: string;
+        readonly version: string;
+    }[];
+    readonly bindings: readonly CouplingBinding[];
+}
+/**
+ * CF-D06's preflight impact diagnostic: what reads a bound load, directly or
+ * through a level measuring it. A refused generated load can refuse these, and
+ * what the mapped rules make depend on them (a requirement enters its
+ * resource's draw); nothing else. Sorted by id.
+ */
+export interface BindingImpact {
+    /** Resources whose requirement rule on the part reads the load. */
+    readonly requirements: readonly T.Id[];
+    /** Resources whose upkeep rule on the part reads the load. */
+    readonly upkeep: readonly T.Id[];
+    /** Works on the part whose reference-output rule reads the load. */
+    readonly referenceOutputs: readonly T.Id[];
+    /** Levels measuring the load: the only way the governor can sense the generated load (CF-D10). */
+    readonly levels: readonly T.Id[];
+    /** What reads those levels in any mode: 'setting:', 'store-release:', 'store-fill:', 'route:' or 'switch:' and its id, or 'band:' and the level the governor holds a band on. */
+    readonly levelReaders: readonly string[];
+    /** Indicators watching the load or one of those levels. */
+    readonly indicators: readonly T.Id[];
+}
+/**
+ * CF-D07: whether the work's reference output is proven never to exceed the
+ * eligible obligations, R_t <= D_t = G_t. Proven only for R = a + b x G with
+ * a = 0 and b <= 1 (a constant 0, or a linear rule with base 0 whose terms all
+ * read the bound load); anything else is unproven, which is flagged and never
+ * rejected. The runtime guard is authoritative either way.
+ */
+export type GuardStatus = 'proven' | 'unproven';
+/** Read an untrusted JSON document into a coupling attachment, collecting every issue with its path. */
+export declare function parseCouplingAttachment(doc: unknown): {
+    attachment?: CouplingAttachment;
+    issues: Issue[];
+};
+/** What reads a bound load (CF-D06), from the model and the work attachment alone. */
+export declare function couplingImpact(model: T.Model, work: WorkAttachment, part: T.Id, load: T.Id): BindingImpact;
+/** CF-D07's static guard for one account's work, as bound to `load`. */
+export declare function staticGuard(rule: T.OrGap<T.RequirementRule>, load: T.Id): {
+    status: GuardStatus;
+    detail: string;
+};
+/** The claims a binding's results are conditional on, where assumed or estimated: its active-workload claim, then the account's own. */
+export declare function conditionsOf(b: CouplingBinding, account: BacklogAccount): string[];
+/** Checks of a parsed coupling attachment against its model, its backlog attachment and that attachment's work attachment, with their exact digests. */
+export declare function checkCouplingAttachment(a: CouplingAttachment, model: T.Model, modelSha256: string, backlog: BacklogAttachment, backlogSha256: string, work: WorkAttachment): Issue[];
+export interface CouplingValidation {
+    readonly ok: boolean;
+    readonly issues: readonly Issue[];
+    readonly attachment?: CouplingAttachment | undefined;
+}
+/** Parse and check a coupling attachment against its model and backlog attachment, each with its exact digest, and the work attachment the backlog attachment names. */
+export declare function validateCouplingAttachment(doc: unknown, model: T.Model, modelSha256: string, backlog: BacklogAttachment, backlogSha256: string, work: WorkAttachment): CouplingValidation;
+```
+
+### src/proposals/couple/trace.ts
+
+```ts
+import type { Id } from '../../core/schema/types.ts';
+import type { RefusalSummary, TV } from '../../core/trace.ts';
+import type { EvidenceStatus } from '../backlog/attachment.ts';
+import type { BindingImpact, GuardStatus } from './attachment.ts';
+export declare const COUPLE_VERSION = "0.1.0";
+export interface CouplingBindingStamp {
+    readonly binding: Id;
+    readonly account: Id;
+    readonly part: Id;
+    readonly load: Id;
+    /** The load's unit, which is the account's obligation unit. */
+    readonly unit: string;
+    /** The active-workload claim, as mapped, with its evidence label and source. */
+    readonly activeWorkload: {
+        readonly statement: string;
+        readonly status: EvidenceStatus;
+        readonly source: string;
+    };
+    /** The assumed or estimated claims (the binding's, then its account's) every coupled result is conditional on (CF-D03). */
+    readonly conditionalOn: readonly string[];
+    /** CF-D07's static guard on the account's work; the runtime guard is authoritative either way. */
+    readonly guard: {
+        readonly status: GuardStatus;
+        readonly detail: string;
+    };
+    /** CF-D06's preflight impact: what reads the bound load. */
+    readonly impact: BindingImpact;
+}
+export interface CouplingRunStamp {
+    readonly coupleVersion: string;
+    readonly proposal: {
+        readonly id: string;
+        readonly version: string;
+    };
+    /** True where any binding's results are conditional on an assumed or estimated claim: a conditional simulation (CF-D03). */
+    readonly conditional: boolean;
+    /** The coupled base run, as its stamp gives it (the CANON fingerprint copied, not reinterpreted), and its trace hash. */
+    readonly base: {
+        readonly engineVersion: string;
+        readonly schemaVersion: string;
+        readonly canonFingerprint: {
+            readonly canon: string;
+            readonly application: string;
+        };
+        readonly traceSha256: string;
+        readonly mapping: {
+            readonly id: Id;
+            readonly sha256: string;
+        };
+        readonly scenario: {
+            readonly id: Id;
+            readonly sha256: string;
+        };
+        readonly steps: number;
+        readonly allocationPolicy: string | null;
+        readonly proposals: readonly string[];
+    };
+    readonly work: {
+        readonly workVersion: string;
+        readonly traceSha256: string;
+        readonly attachment: {
+            readonly id: Id;
+            readonly version: string;
+            readonly sha256: string;
+        };
+    };
+    readonly backlog: {
+        readonly backlogVersion: string;
+        readonly traceSha256: string;
+        readonly attachment: {
+            readonly id: Id;
+            readonly version: string;
+            readonly sha256: string;
+        };
+    };
+    readonly attachment: {
+        readonly id: Id;
+        readonly version: string;
+        readonly sha256: string;
+    };
+    /**
+     * The effective scenario a replay through the unchanged runners reads
+     * (couplingReplayScenario): the scenario with each generated load stated as
+     * a series. Derived from this run, never an external input (CF-D05).
+     */
+    readonly replayScenario: {
+        readonly id: Id;
+        readonly sha256: string;
+        readonly derived: true;
+    };
+    readonly bindings: readonly CouplingBindingStamp[];
+}
+export interface CouplingRecord {
+    readonly binding: Id;
+    readonly account: Id;
+    readonly part: Id;
+    readonly load: Id;
+    /** G_t = D_t = B_t + N_t: the account's eligible obligations before the step, given to the load for the step. */
+    readonly generated: TV;
+}
+export interface CouplingStepRecord {
+    readonly step: number;
+    readonly bindings: readonly CouplingRecord[];
+}
+export interface RefusalPathEntry {
+    readonly trace: 'coupling' | 'base' | 'work' | 'backlog';
+    /** A field of that trace's step records, with each record array labelled by its record's ids (for example parts[a/r].requirement). */
+    readonly field: string;
+    /** The steps in which the refusal refuses it. */
+    readonly steps: readonly number[];
+}
+export interface RefusalPath {
+    readonly refusal: string;
+    /** Every field the refusal refuses, by its first step, then the order of computation in a step (coupling, base, work, backlog), then field. */
+    readonly reaches: readonly RefusalPathEntry[];
+}
+export interface CouplingTrace {
+    readonly stamp: CouplingRunStamp;
+    readonly steps: readonly CouplingStepRecord[];
+    /** Every refusal behind a refused generated load, once each, with where it applies. */
+    readonly refusals: readonly RefusalSummary[];
+    /** For each of those refusals, the fields it refuses in the four traces (CF-D06). */
+    readonly refusalPaths: readonly RefusalPath[];
+    /** Open question ids behind the refusals, sorted. */
+    readonly questions: readonly string[];
+}
+/** SHA-256 of the canonical coupling trace. */
+export declare function couplingTraceHash(trace: CouplingTrace): string;
+```
+
+### src/proposals/couple/run-coupled.ts
+
+```ts
+import type { RunOptions } from '../../core/run.ts';
+import type { RunTrace } from '../../core/trace.ts';
+import type { BacklogTrace } from '../backlog/trace.ts';
+import type { WorkTrace } from '../work/trace.ts';
+import type { CouplingTrace } from './trace.ts';
+type Doc = Record<string, unknown>;
+/**
+ * The effective scenario of a coupled run (CF-D05): its scenario with each
+ * generated load stated as a series, one entry per step, a refused value as
+ * an information gap. The unchanged runners, given it, compute the coupled
+ * run's known figures and refuse the same fields; the stamps, tags, hashes
+ * and some refusal ids differ by design. Its id ends '.replay' and its digest
+ * is the coupling stamp's replayScenario, labelled derived there.
+ */
+export declare function couplingReplayScenario(scenarioDoc: unknown, coupling: CouplingTrace): Doc;
+/**
+ * Validate the model, the work, backlog and coupling attachments and the
+ * scenario, and run them coupled: the base, work and backlog traces, the base
+ * stamp naming P-COUPLE-01, and the coupling trace, always together. Throws
+ * where the coupled run is not valid (ModelInvalidError: among others a
+ * binding whose active-workload claim is unknown, or a scenario that also
+ * gives a bound load a series, with no fallback to the scenario's loads) or
+ * cannot be configured (ConfigurationError); every value it cannot compute is
+ * refused in the result.
+ */
+export declare function runCoupled(modelDoc: unknown, scenarioDoc: unknown, workAttachmentDoc: unknown, backlogAttachmentDoc: unknown, couplingAttachmentDoc: unknown, options?: RunOptions): {
+    base: RunTrace;
+    work: WorkTrace;
+    backlog: BacklogTrace;
+    coupling: CouplingTrace;
+};
+export {};
+```
+
 ### src/draft/index.ts
 
 ```ts
@@ -1824,6 +2099,29 @@ A backlog attachment that breaks an error rule stops `runBacklog` before any run
 - [backlog-evidence] Evidence is `documented`, `estimated`, `assumed` or `unknown`, with a source.
 - [backlog-unknown-claim] (flag) An unknown claim: what depends on it is refused.
 - [backlog-conditional] (flag) An assumed or estimated claim: the account's results are conditional on it.
+
+### Coupling attachment (P-COUPLE-01; against its model, its backlog attachment and that attachment's work attachment)
+A coupling attachment that breaks an error rule stops `runCoupled` before anything is computed, with `ModelInvalidError`: the attempted coupled run is invalid, and nothing falls back to the scenario's loads (CF-D03, F.4). It reuses the shape codes above ([unknown-field], [missing-field], [type], [bad-id], [duplicate-id], [unknown-reference]) and adds:
+- [couple-version] The attachment states format 0.1.0.
+- [couple-proposal] It enables P-COUPLE-01 at version 0.1, and nothing else.
+- [couple-model], [couple-model-digest] It names the model's id and that model's exact digest.
+- [couple-backlog-attachment] It names the backlog attachment by id, version and exact digest, and that attachment names the same model.
+- [couple-digest] A digest is 64 lower-case hex digits.
+- [couple-no-binding] It has at least one binding.
+- [couple-account] A binding names an account the backlog attachment maps.
+- [couple-part] The binding's part is the account's own part: no cross-part generation (CF-D02).
+- [couple-load] The part declares the load.
+- [couple-unit] The load's unit is exactly the account's obligation unit (CF-D02).
+- [couple-load-twice] A load has one source: one binding per load (CF-D02).
+- [couple-account-twice] An account generates one load (CF-D02).
+- [couple-evidence] The active-workload claim's evidence is `documented`, `estimated`, `assumed` or `unknown`, with a source.
+- [couple-unknown-claim] An unknown active-workload claim: the coupled run is invalid (CF-D03).
+- [couple-conditional] (flag) An assumed or estimated active-workload claim: the coupled results are a conditional simulation (CF-D03).
+- [couple-guard-unproven] (flag) The account's work has a reference-output rule not of the proven form R = b x G with b <= 1 (CF-D07). It is never rejected; the ledger's runtime guard R_t <= D_t still applies.
+- [couple-impact] (flag) The preflight impact diagnostic: what reads the bound load (CF-D06).
+- [couple-sensed-level] (flag) A level measures the bound load, so the governor can sense the generated load in the same step, through the level's producing part and route (CF-D10).
+
+The scenario of a coupled run is checked by the coupling-only path, `validateCoupledScenario`, which is not on an entry point: a bound load has no series ([load-supplied]), and [load-missing] is not raised for it. The exported `validateScenario` is unchanged, so the ordinary run still needs every load.
 
 ## 3. The simulation-step sequence
 
@@ -2003,6 +2301,20 @@ Every term is 0 or more, so a known 0 settles a minimum, or the product with yie
 
 Nothing is written to the base or work trace, and no ledger value reaches the next step's load, requirement, reference output, draw, units or levels. The backlog trace carries its stamp (the backlog version, P-LOAD-02 and its version, the base run's versions, CANON fingerprint, trace hash, mapping and scenario digests; the work trace's version, hash, attachment and proposals; the backlog attachment's id, version and digest; each account with its claims, evidence and conditions), the records per step and account, every refusal behind a ledger value (ids it creates start `backlog/`; ids from the work trace are kept) and the open questions behind them.
 
+### The coupled run (P-COUPLE-01): the backlog fed back, step by step
+`runCoupled(model, scenario, workAttachment, backlogAttachment, couplingAttachment, options)` validates the model, the work, backlog and coupling attachments in turn, the scenario by the coupling-only path, and the allocation policy as `run()` does. It then takes the base run, the work and the ledger one step at a time, with the step cursors their own runners use, and, for each step t in order and each binding (sorted by id):
+1. **Generated load** G_t = D_t = B_t + N_t: the account's eligible obligations before the step, from its carried balance and its admissions (G_0 = B_0 + N_0).
+2. **One PAM step** with G_t given for the bound load. Every rule of this section applies unchanged: requirement, sensing, access, the draw, P-LOAD-01 where enabled, and the reconciliation. A level's reading of G_t is tagged `computed`; what it sends and what is delivered follow its producing part and route.
+3. **One work step** on that step's state, its reference output reading G_t.
+4. **One ledger closure**, with the guards above: C_t, then B_{t+1} = D_t - C_t, from which G_{t+1} follows.
+
+C_t never changes step t. A refused G refuses what the mapped rules make depend on it, and nothing else; a refused closing balance refuses every later G of its binding; nothing restarts. The base trace's stamp names P-COUPLE-01, and the work and backlog traces are as their runners make them. The **coupling trace** has:
+- **its stamp:** P-COUPLE-01 0.1; `conditional`; the base run's versions, CANON fingerprint, trace hash, mapping, scenario and proposals; the work and backlog traces' hashes and attachments; the coupling attachment's digest; the replay scenario's id and digest, labelled `derived`; and per binding its claim and evidence, the claims it is conditional on, the static guard and the impact;
+- **G_t** per step and binding, tagged `computed`;
+- **every refusal** behind a refused G, and for each its **refusal path**: every field it refuses in the four traces, with the steps, in order of first step and then of computation.
+
+No trace names the coupling trace, so no fingerprint is circular. `couplingReplayScenario(scenario, couplingTrace)` gives the effective scenario: the generated loads stated as series, one entry per step, with a refused value as a gap, and an id ending `.replay`. The unchanged `runBacklog` on it gives the same known figures and refuses the same fields; the stamps, tags, hashes and some refusal ids differ by design.
+
 ## 4. Refusal categories
 
 | Category | Meaning | Produced by |
@@ -2033,6 +2345,7 @@ None of these is CANON; each can be withdrawn by James. The stamp lists every pr
 | P-WORK-01 | Only in `runWork`, for a work attachment that enables it; never in `run()` and never through a scenario | Useful work from a part's own resources (section 3, the work extension): reference output, recipe, capacity, yield, actual output and work not done, in the work's own unit. Approved by James 2026-10-20 as an optional modelling proposal, not CANON |
 | P-DEP-01 | Only in `runWork`, for an attachment that enables it and maps links | A functional cap on an existing dependency: the downstream actual output is at most the upstream actual output / ratio, same step, non-exclusive enablement only; nothing is deducted upstream and nothing becomes a resource route. Ordinary dependencies stay rank-only |
 | P-LOAD-02 | Only in `runBacklog` or `backlogFromTraces`, for a backlog attachment that enables it; never in `run()` or `runWork()`, never through a scenario | Carryable obligations, tracking only (section 3, the backlog ledger): per account and step, opening balance, admissions, eligible obligations, completions read one to one from the work's actual output behind its guards, withdrawals of 0, closing balance. No feedback into any run. Approved by James 2026-10-20 as an optional proposal, not CANON |
+| P-COUPLE-01 | Only in `runCoupled`, for a coupling attachment that enables it; never in `run()`, `runWork()` or `runBacklog()`, never through a scenario | Coupled backlog feedback (section 3, the coupled run): an account's eligible obligations G_t = B_t + N_t are given, step by step, to one load declared on the account's own part, in its exact unit, under an active-workload claim that holds for the whole run; the existing rules do the rest. The v0.3 design resolutions were approved by James, and the implementation authorised on 2026-10-20. An optional proposal, not CANON |
 | APP-04 | Scenario validation | A scenario cannot declare components (APPLICATION 5) |
 | APP-08 | Every run (flag only) | Flags a step where the top is short of the protected resource while another part is not, noting any support part short in the step before (APPLICATION, Applying CANON 4) |
 

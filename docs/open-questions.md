@@ -216,7 +216,7 @@ Questions about the optional proposals P-WORK-01 and P-DEP-01 (docs/proposals.md
 - **Question:** should work done or not done change anything in a later step (a backlog carried into a load, a part's physical state, recovery), and through which named rule?
 - **Case:** IT support's tickets not resolved in a week of the income cut.
 - **Blocks:** backlog and deterioration scenarios; any answer ends the separation of work from the base run for the runs that enable it.
-- **Meanwhile:** work not done is counted each step and nothing carries. Since 2026-10-20 P-LOAD-02 tracks eligible obligations from step to step in a ledger of its own, with no feedback into any later step (tracking only); the question of feedback stays open.
+- **Meanwhile:** work not done is counted each step and nothing carries. Since 2026-10-20 P-LOAD-02 tracks eligible obligations from step to step in a ledger of its own, with no feedback (tracking only). P-COUPLE-01 (the v0.3 design resolutions, approved, implementation authorised 2026-10-20) feeds an account's eligible obligations back into one load of its own part, in `runCoupled` only. Any other feedback (a part's physical state, deterioration, recovery) stays open.
 
 ### WQ-04. Work as a level the governor senses
 - **Status:** open: raised by the work extension (contract section 10), not yet ruled on.
