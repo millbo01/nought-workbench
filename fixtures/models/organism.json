@@ -1,0 +1,94 @@
+{
+  "schemaVersion": "0.4.0",
+  "id": "hypothetical-organism",
+  "label": "Hypothetical simple organism",
+  "rationale": "HYPOTHETICAL. Invented structure and numbers with non-organisational labels, to show the core carries no domain terms. Not a description of any real physiology.",
+  "resources": [{ "id": "glucose", "unit": "mmol", "storable": true, "label": "Glucose (hypothetical)" }],
+  "boundary": {
+    "id": "organism-boundary",
+    "top": "core",
+    "rationale": "Hypothetical. The central tissue is taken as the part everything else is sacrificed to keep going."
+  },
+  "parts": [
+    {
+      "id": "core", "label": "Central tissue", "units": 100,
+      "requirement": [{ "resource": "glucose", "rule": { "kind": "constant", "value": 50 } }],
+      "upkeep": [{ "resource": "glucose", "rule": { "kind": "constant", "value": 30 } }],
+      "rank": { "layer": 0, "position": 1 },
+      "rationale": "Hypothetical. Also senses the glycogen content and the last step's intake."
+    },
+    {
+      "id": "pump", "label": "Pump", "units": 10,
+      "loads": [{ "id": "exertion", "unit": "relative exertion" }],
+      "requirement": [{ "resource": "glucose", "rule": { "kind": "linear", "base": 15, "terms": [{ "load": "exertion", "per": 5 }] } }],
+      "upkeep": [{ "resource": "glucose", "rule": { "kind": "constant", "value": 10 } }],
+      "rank": { "layer": 1, "position": 1 }
+    },
+    {
+      "id": "liver", "label": "Liver", "units": 20,
+      "requirement": [{ "resource": "glucose", "rule": { "kind": "constant", "value": 15 } }],
+      "upkeep": [{ "resource": "glucose", "rule": { "kind": "constant", "value": 5 } }],
+      "rank": { "layer": 1, "position": 2 }
+    }
+  ],
+  "dependencies": [
+    { "part": "pump", "feeds": "core" },
+    { "part": "liver", "feeds": "core" }
+  ],
+  "governor": {
+    "id": "governor",
+    "bands": [
+      { "level": "glycogen-content", "lower": 100, "upper": 400, "held": 300 },
+      { "level": "intake-last-step", "lower": 0, "upper": 200 }
+    ],
+    "controls": { "settings": ["core-glucose", "pump-glucose"], "stores": ["glycogen"], "routes": [] }
+  },
+  "levels": [
+    {
+      "id": "glycogen-content", "unit": "mmol",
+      "measures": { "of": "store-content", "store": "glycogen" },
+      "producedBy": "core", "route": { "kind": "own-route" }, "missingSignal": "alarm",
+      "whenProducerShort": { "kind": "keeps-sending" }
+    },
+    {
+      "id": "intake-last-step", "unit": "mmol",
+      "measures": { "of": "inflow", "resource": "glucose" },
+      "producedBy": "core", "route": { "kind": "shared-flow", "resource": "glucose" }, "missingSignal": "no-intervention",
+      "whenProducerShort": { "kind": "stops-when-short", "above": [{ "resource": "glucose", "amount": 10 }] }
+    }
+  ],
+  "indicators": [
+    { "id": "core-supply", "kind": "protected-flow", "watches": { "protectedFlow": true } },
+    { "id": "glycogen-watch", "kind": "held-level", "watches": { "level": "glycogen-content" } },
+    { "id": "exertion-watch", "kind": "neither", "watches": { "measure": { "of": "load", "part": "pump", "load": "exertion" } } }
+  ],
+  "settings": [
+    { "id": "core-glucose", "part": "core", "resource": "glucose", "kind": "governor-set", "rule": { "kind": "constant", "value": 50 } },
+    {
+      "id": "pump-glucose", "part": "pump", "resource": "glucose", "kind": "governor-set",
+      "rule": { "kind": "constant", "value": 20 }, "proposalData": { "P-ALLOC-01": { "grading": 1 } }
+    },
+    {
+      "id": "liver-glucose", "part": "liver", "resource": "glucose", "kind": "built-in",
+      "rule": { "kind": "constant", "value": 15 }, "proposalData": { "P-ALLOC-01": { "grading": 2 } }
+    }
+  ],
+  "modes": [
+    { "id": "fed", "held": ["glycogen-content", "intake-last-step"], "settings": ["core-glucose", "pump-glucose", "liver-glucose"] }
+  ],
+  "initialMode": "fed",
+  "protectedFlow": { "resource": "glucose" },
+  "routes": [],
+  "stores": [
+    {
+      "id": "glycogen", "resource": "glucose", "capacity": 400,
+      "release": {
+        "kind": "governor-set",
+        "rule": { "kind": "step", "reads": "intake-last-step", "below": 50, "steps": [{ "from": 90, "value": 0 }], "whenSilent": { "alarm": 50 } }
+      },
+      "fill": { "kind": "built-in", "rule": { "kind": "constant", "value": 30 } }
+    }
+  ],
+  "outsideInputs": [],
+  "thresholdSwitches": []
+}

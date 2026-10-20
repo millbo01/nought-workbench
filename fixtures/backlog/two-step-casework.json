@@ -1,0 +1,76 @@
+{
+  "attachmentVersion": "0.1.0",
+  "id": "two-step-casework-backlog",
+  "label": "Open cases (hypothetical)",
+  "rationale": "Hypothetical reference fixture for P-LOAD-02 (tracking only); illustrative numbers. Expected: eligible 10, completed 6, closing 4; then eligible 7, completed 7, closing 0.",
+  "model": "two-step-casework",
+  "modelSha256": "d555a71c9f46c3b831fdb56e3809e250c94612aefb8cc22175c15e06f4ce95fd",
+  "workAttachment": {
+    "id": "two-step-casework-work",
+    "version": "0.1.0",
+    "sha256": "d27403dd68a2db081187516b674687f419d398cefcbf0763c7552776a6f5af4a"
+  },
+  "proposals": [
+    {
+      "id": "P-LOAD-02",
+      "version": "0.1"
+    }
+  ],
+  "accounts": [
+    {
+      "account": "open-cases",
+      "part": "casework",
+      "work": "cases-closed",
+      "obligationUnit": "cases",
+      "divisibility": "indivisible",
+      "eligibility": {
+        "definition": "A case opened and not yet closed.",
+        "carryable": "An open case stays open until it is closed.",
+        "boundary": "Cases of this team only.",
+        "evidence": {
+          "status": "assumed",
+          "source": "Hypothetical reference fixture for P-LOAD-02 (tracking only); illustrative numbers. By the construction of the example."
+        }
+      },
+      "closure": {
+        "oneToOne": true,
+        "statement": "Each case closed (one unit of the work output) closes one open case.",
+        "evidence": {
+          "status": "assumed",
+          "source": "Hypothetical reference fixture for P-LOAD-02 (tracking only); illustrative numbers. By the construction of the example."
+        }
+      },
+      "withdrawals": {
+        "zeroEveryStep": true,
+        "statement": "No case is withdrawn or cancelled in the two steps.",
+        "evidence": {
+          "status": "assumed",
+          "source": "Hypothetical reference fixture for P-LOAD-02 (tracking only); illustrative numbers. By the construction of the example."
+        }
+      },
+      "openingBalance": {
+        "value": 0,
+        "evidence": {
+          "status": "assumed",
+          "source": "Hypothetical reference fixture for P-LOAD-02 (tracking only); illustrative numbers. The team starts with no open cases."
+        }
+      },
+      "admissions": {
+        "perStep": [
+          {
+            "step": 0,
+            "value": 10
+          },
+          {
+            "step": 1,
+            "value": 3
+          }
+        ],
+        "evidence": {
+          "status": "assumed",
+          "source": "Hypothetical reference fixture for P-LOAD-02 (tracking only); illustrative numbers. 10 new cases in step 0, 3 in step 1."
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en-GB" data-engine="browser">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>N-ought Analyst Workbench</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <header class="bar">
+    <div class="brand"><strong>N-ought</strong> Analyst Workbench</div>
+    <label class="example">Example <select id="example"></select></label>
+    <button id="run" class="primary">Run comparison</button>
+    <span id="status" class="status" role="status"></span>
+    <span id="versions" class="versions"></span>
+  </header>
+  <p class="banner" id="banner">Every number here is computed by the N-ought engine on this machine, exactly, from the mapped model and the scenario values shown. Nothing is estimated by AI. Hover any mark or cell for the exact value or the reason it was refused.</p>
+  <main class="layout">
+    <section id="system" class="panel"></section>
+    <div class="work">
+      <section id="scenario" class="panel"></section>
+      <section id="results" class="panel"></section>
+    </div>
+  </main>
+  <footer class="footer" id="footer" hidden></footer>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

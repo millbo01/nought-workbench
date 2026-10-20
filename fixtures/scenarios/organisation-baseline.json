@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "0.4.0",
+  "id": "organisation-baseline",
+  "model": "hypothetical-organisation",
+  "label": "Income cut, a grant, rising caseload, a change to pressure settings (hypothetical)",
+  "rationale": "HYPOTHETICAL numbers. Exercises the store, the route cap, outside input, an intervention that changes only settings (an arrangement revision) and a threshold switch that adds a held level (a mode change), with no step in which committed access exceeds what arrives.",
+  "steps": 10,
+  "seed": 0,
+  "initial": { "stores": [{ "store": "reserve", "content": 40 }] },
+  "inflow": [
+    { "resource": "money", "entries": [{ "step": 0, "value": 100 }, { "step": 4, "value": 80 }, { "step": 8, "value": 100 }] },
+    { "resource": "staff-time", "entries": [{ "step": 0, "value": 260 }] }
+  ],
+  "outsideInput": [
+    { "input": "grant", "entries": [{ "step": 0, "value": 0 }, { "step": 5, "value": 10 }, { "step": 6, "value": 0 }] }
+  ],
+  "loads": [
+    { "part": "service", "load": "caseload", "entries": [{ "step": 0, "value": 100 }, { "step": 6, "value": 110 }] },
+    { "part": "it-support", "load": "tickets", "entries": [{ "step": 0, "value": 10 }] }
+  ],
+  "events": [
+    { "step": 7, "kind": "intervention", "setMode": "pressure", "note": "Hypothetical: pressure settings adopted after the caseload rise." }
+  ]
+}

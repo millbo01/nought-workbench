@@ -1,0 +1,46 @@
+{
+  "attachmentVersion": "0.1.0",
+  "id": "two-step-casework-work",
+  "label": "Cases closed (hypothetical)",
+  "rationale": "Hypothetical reference fixture for P-LOAD-02 (tracking only); illustrative numbers.",
+  "model": "two-step-casework",
+  "modelSha256": "d555a71c9f46c3b831fdb56e3809e250c94612aefb8cc22175c15e06f4ce95fd",
+  "proposals": [
+    {
+      "id": "P-WORK-01",
+      "version": "0.3"
+    }
+  ],
+  "works": [
+    {
+      "part": "casework",
+      "work": "cases-closed",
+      "workUnit": "cases",
+      "definition": "Cases completed and closed in the step: each closes one open case.",
+      "referenceOutputRule": {
+        "kind": "linear",
+        "base": 0,
+        "terms": [
+          {
+            "load": "cases-on-hand",
+            "per": 1
+          }
+        ]
+      },
+      "recipe": [
+        {
+          "resource": "hours",
+          "perWorkUnit": 2
+        }
+      ],
+      "capacity": {
+        "kind": "constant",
+        "value": 50,
+        "rationale": "The case system accepts at most 50 closures a step, whatever the team size."
+      },
+      "yield": 1,
+      "rationale": "Reference output: every case on hand. Two staff hours per case, from what is left after 2 hours of upkeep."
+    }
+  ],
+  "links": []
+}

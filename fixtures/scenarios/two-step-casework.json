@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "0.4.0",
+  "id": "two-step-casework",
+  "model": "two-step-casework",
+  "label": "Two weeks: 14 hours, then 20 (hypothetical)",
+  "rationale": "Hypothetical reference fixture for P-LOAD-02 (tracking only); illustrative numbers. 14 hours arrive in step 0 and 20 in step 1. The cases on hand (10, then 7) are stated in the scenario: tracking-only P-LOAD-02 never feeds the ledger's eligible obligations back into a load, so the mapper states the load, and here it equals them.",
+  "steps": 2,
+  "seed": 0,
+  "initial": {
+    "stores": [],
+    "readings": []
+  },
+  "inflow": [
+    {
+      "resource": "hours",
+      "entries": [
+        {
+          "step": 0,
+          "value": 14
+        },
+        {
+          "step": 1,
+          "value": 20
+        }
+      ]
+    }
+  ],
+  "outsideInput": [],
+  "loads": [
+    {
+      "part": "casework",
+      "load": "cases-on-hand",
+      "entries": [
+        {
+          "step": 0,
+          "value": 10
+        },
+        {
+          "step": 1,
+          "value": 7
+        }
+      ]
+    }
+  ],
+  "events": []
+}

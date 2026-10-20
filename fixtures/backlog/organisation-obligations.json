@@ -1,0 +1,123 @@
+{
+  "attachmentVersion": "0.1.0",
+  "id": "organisation-obligations",
+  "label": "Payment and appointment requests carried as obligations (hypothetical)",
+  "rationale": "HYPOTHETICAL numbers, for James to review. Tracking only (P-LOAD-02): the ledger reads the organisation-availability work and changes nothing in any run. Finance's reference output (100 payments) equals its new requests per step, so a backlog built in a bad step is never cleared within the run: the work's reference output does not follow the backlog. Every claim is assumed, so every result is conditional.",
+  "model": "hypothetical-organisation",
+  "modelSha256": "ae6bd03159cd0f96fd798dc82c69b1411b06f24c74493e6880ce31ed8aa04816",
+  "workAttachment": {
+    "id": "organisation-availability",
+    "version": "0.1.0",
+    "sha256": "f336bd17fbbd5c527953aa087bbcbc69b73e3313757d9682ed866609a4c1ba90"
+  },
+  "proposals": [
+    {
+      "id": "P-LOAD-02",
+      "version": "0.1"
+    }
+  ],
+  "accounts": [
+    {
+      "account": "payment-requests",
+      "part": "finance",
+      "work": "finance-payments",
+      "obligationUnit": "payments",
+      "divisibility": "indivisible",
+      "eligibility": {
+        "definition": "A supplier or staff payment requested and not yet completed and released.",
+        "carryable": "A requested payment stays due until it is made.",
+        "boundary": "Payments handled by the finance office.",
+        "evidence": {
+          "status": "assumed",
+          "source": "HYPOTHETICAL numbers, for James to review. Mapping assumption."
+        }
+      },
+      "closure": {
+        "oneToOne": true,
+        "statement": "Each payment completed and released (one unit of finance-payments) settles one requested payment.",
+        "evidence": {
+          "status": "assumed",
+          "source": "HYPOTHETICAL numbers, for James to review. Mapping assumption."
+        }
+      },
+      "withdrawals": {
+        "zeroEveryStep": true,
+        "statement": "No payment request is withdrawn in the run.",
+        "evidence": {
+          "status": "assumed",
+          "source": "HYPOTHETICAL numbers, for James to review. Mapping assumption."
+        }
+      },
+      "openingBalance": {
+        "value": 0,
+        "evidence": {
+          "status": "assumed",
+          "source": "HYPOTHETICAL numbers, for James to review. No payments outstanding at the start."
+        }
+      },
+      "admissions": {
+        "perStep": [
+          {
+            "step": 0,
+            "value": 100
+          }
+        ],
+        "evidence": {
+          "status": "assumed",
+          "source": "HYPOTHETICAL numbers, for James to review. 100 new payment requests a week."
+        }
+      }
+    },
+    {
+      "account": "appointment-requests",
+      "part": "scheduling",
+      "work": "scheduling-appointments",
+      "obligationUnit": "appointments",
+      "divisibility": "indivisible",
+      "eligibility": {
+        "definition": "An appointment requested and not yet booked onto the rota.",
+        "carryable": "A request stays open until it is booked.",
+        "boundary": "Requests handled by the scheduling team.",
+        "evidence": {
+          "status": "assumed",
+          "source": "HYPOTHETICAL numbers, for James to review. Mapping assumption."
+        }
+      },
+      "closure": {
+        "oneToOne": true,
+        "statement": "Each appointment booked (one unit of scheduling-appointments) closes one request.",
+        "evidence": {
+          "status": "assumed",
+          "source": "HYPOTHETICAL numbers, for James to review. Mapping assumption."
+        }
+      },
+      "withdrawals": {
+        "zeroEveryStep": true,
+        "statement": "No appointment request is withdrawn in the run.",
+        "evidence": {
+          "status": "assumed",
+          "source": "HYPOTHETICAL numbers, for James to review. Mapping assumption."
+        }
+      },
+      "openingBalance": {
+        "value": 0,
+        "evidence": {
+          "status": "assumed",
+          "source": "HYPOTHETICAL numbers, for James to review. No requests outstanding at the start."
+        }
+      },
+      "admissions": {
+        "perStep": [
+          {
+            "step": 0,
+            "value": 60
+          }
+        ],
+        "evidence": {
+          "status": "assumed",
+          "source": "HYPOTHETICAL numbers, for James to review. 60 new requests a week."
+        }
+      }
+    }
+  ]
+}

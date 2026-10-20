@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "0.4.0",
+  "id": "organism-baseline",
+  "model": "hypothetical-organism",
+  "label": "Fed, then reduced intake, then fed again (hypothetical)",
+  "rationale": "HYPOTHETICAL numbers. At step 3 intake falls before the store release responds (the governor reads the last step's intake), so committed access exceeds what arrives and P-ALLOC-01 grades the cut; from step 4 the store is drawn.",
+  "steps": 10,
+  "seed": 0,
+  "initial": {
+    "stores": [{ "store": "glycogen", "content": 300 }],
+    "readings": [{ "level": "intake-last-step", "value": 100 }]
+  },
+  "inflow": [
+    { "resource": "glucose", "entries": [{ "step": 0, "value": 100 }, { "step": 3, "value": 60 }, { "step": 8, "value": 100 }] }
+  ],
+  "outsideInput": [],
+  "loads": [
+    { "part": "pump", "load": "exertion", "entries": [{ "step": 0, "value": 1 }, { "step": 5, "value": 2 }] }
+  ],
+  "events": []
+}

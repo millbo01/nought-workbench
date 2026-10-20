@@ -1,0 +1,37 @@
+{
+  "note": "Examples the N-ought Analyst Workbench offers. Each names repository fixtures; the model, work and backlog attachments are fixed, and only scenario values are edited in the browser.",
+  "examples": [
+    {
+      "id": "organisation",
+      "label": "Organisation: service, finance, scheduling, IT support (hypothetical)",
+      "model": "fixtures/models/organisation.json",
+      "scenarios": [
+        "fixtures/scenarios/organisation-baseline.json",
+        "fixtures/scenarios/organisation-inflow-cut.json",
+        "fixtures/scenarios/organisation-unit-loss.json"
+      ],
+      "work": "fixtures/work/organisation-availability.json",
+      "backlog": "fixtures/backlog/organisation-obligations.json",
+      "baseline": "organisation-baseline",
+      "intervention": "organisation-baseline"
+    },
+    {
+      "id": "two-step-casework",
+      "label": "Two-step casework office (hypothetical reference)",
+      "model": "fixtures/models/two-step-casework.json",
+      "scenarios": ["fixtures/scenarios/two-step-casework.json"],
+      "work": "fixtures/work/two-step-casework.json",
+      "backlog": "fixtures/backlog/two-step-casework.json",
+      "baseline": "two-step-casework",
+      "intervention": "two-step-casework"
+    },
+    {
+      "id": "organism",
+      "label": "Organism: glucose regulation (hypothetical)",
+      "model": "fixtures/models/organism.json",
+      "scenarios": ["fixtures/scenarios/organism-baseline.json"],
+      "baseline": "organism-baseline",
+      "intervention": "organism-baseline"
+    }
+  ]
+}

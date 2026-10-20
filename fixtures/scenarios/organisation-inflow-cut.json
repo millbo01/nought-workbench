@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "0.4.0",
+  "id": "organisation-inflow-cut",
+  "model": "hypothetical-organisation",
+  "label": "A sharp income cut (hypothetical)",
+  "rationale": "HYPOTHETICAL numbers. Committed money access exceeds what arrives at step 2, so P-ALLOC-01 grades the cut and finance, which produces the reserve-balance level, goes short by more than its sending dial allows. From step 3 the report is never sent; the governor reads the silence as alarm and the settings give their mapped alarm responses (decision Q-004, PROP-SENSE-01). IT support, ranked lowest, is starved of money from step 2, so its backlog report stops from step 3; its backlog then rises to 30 tickets, raising its staff-time requirement, but the governor reads that silence as no intervention, so its hours stay at 10 and the growing shortfall shows only in the definite state.",
+  "steps": 5,
+  "seed": 0,
+  "initial": { "stores": [{ "store": "reserve", "content": 50 }] },
+  "inflow": [
+    { "resource": "money", "entries": [{ "step": 0, "value": 100 }, { "step": 2, "value": 60 }] },
+    { "resource": "staff-time", "entries": [{ "step": 0, "value": 260 }] }
+  ],
+  "outsideInput": [{ "input": "grant", "entries": [{ "step": 0, "value": 0 }] }],
+  "loads": [
+    { "part": "service", "load": "caseload", "entries": [{ "step": 0, "value": 100 }] },
+    { "part": "it-support", "load": "tickets", "entries": [{ "step": 0, "value": 10 }, { "step": 3, "value": 30 }] }
+  ],
+  "events": []
+}

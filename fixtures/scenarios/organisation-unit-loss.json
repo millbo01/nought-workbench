@@ -1,0 +1,82 @@
+{
+  "schemaVersion": "0.4.0",
+  "id": "organisation-unit-loss",
+  "model": "hypothetical-organisation",
+  "label": "Income cut and recovery with unit loss and rebuilding enabled (hypothetical)",
+  "rationale": "HYPOTHETICAL numbers. The same cut as organisation-inflow-cut, then a recovery to 140, with P-LOAD-01 enabled for this run only: parts whose upkeep is not covered lose units, and lost units are rebuilt from the money left once every part has drawn and the reserve has filled.",
+  "steps": 10,
+  "seed": 0,
+  "enable": [
+    "P-LOAD-01"
+  ],
+  "initial": {
+    "stores": [
+      {
+        "store": "reserve",
+        "content": 50
+      }
+    ]
+  },
+  "inflow": [
+    {
+      "resource": "money",
+      "entries": [
+        {
+          "step": 0,
+          "value": 100
+        },
+        {
+          "step": 2,
+          "value": 60
+        },
+        {
+          "step": 5,
+          "value": 140
+        }
+      ]
+    },
+    {
+      "resource": "staff-time",
+      "entries": [
+        {
+          "step": 0,
+          "value": 260
+        }
+      ]
+    }
+  ],
+  "outsideInput": [
+    {
+      "input": "grant",
+      "entries": [
+        {
+          "step": 0,
+          "value": 0
+        }
+      ]
+    }
+  ],
+  "loads": [
+    {
+      "part": "service",
+      "load": "caseload",
+      "entries": [
+        {
+          "step": 0,
+          "value": 100
+        }
+      ]
+    },
+    {
+      "part": "it-support",
+      "load": "tickets",
+      "entries": [
+        {
+          "step": 0,
+          "value": 10
+        }
+      ]
+    }
+  ],
+  "events": []
+}

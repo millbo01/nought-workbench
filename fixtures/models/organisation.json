@@ -1,0 +1,266 @@
+{
+  "schemaVersion": "0.4.0",
+  "id": "hypothetical-organisation",
+  "label": "Hypothetical community service organisation",
+  "rationale": "HYPOTHETICAL. Every number and label is invented to exercise the engine; nothing here describes a real organisation or a real data set.",
+  "resources": [
+    { "id": "money", "unit": "GBP thousand", "storable": true, "label": "Money (hypothetical)" },
+    { "id": "staff-time", "unit": "hours", "storable": false, "label": "Staff time (hypothetical): hours in a period cannot be held for the next" }
+  ],
+  "boundary": {
+    "id": "organisation-boundary",
+    "top": "service",
+    "label": "The organisation",
+    "rationale": "Hypothetical. The frontline service is taken as the part everything else is sacrificed to keep going (a statutory duty), fixed at mapping before any scenario."
+  },
+  "parts": [
+    {
+      "id": "service",
+      "label": "Frontline service",
+      "units": 40,
+      "loads": [{ "id": "caseload", "unit": "cases", "label": "Open cases" }],
+      "requirement": [
+        { "resource": "money", "rule": { "kind": "linear", "base": 20, "terms": [{ "load": "caseload", "per": "0.5" }] } },
+        { "resource": "staff-time", "rule": { "kind": "linear", "base": 0, "terms": [{ "load": "caseload", "per": 2 }] } }
+      ],
+      "upkeep": [
+        { "resource": "money", "rule": { "kind": "constant", "value": 10 } },
+        { "resource": "staff-time", "rule": { "kind": "constant", "value": 20 } }
+      ],
+      "rank": { "layer": 0, "position": 1 },
+      "loadDials": {
+        "unitLossUnderShortfall": { "parameters": { "money": "1/2", "staff-time": "1/10" }, "note": "Hypothetical: units lost per unit of upkeep not covered (P-LOAD-01)." },
+        "unitRebuilding": { "parameters": { "perStep": "1", "money": "2" }, "note": "Hypothetical: at most 1 units rebuilt a step, at 2 of money each (P-LOAD-01)." }
+      }
+    },
+    {
+      "id": "finance",
+      "label": "Finance office",
+      "rationale": "Hypothetical. Its work feeds the service; it also measures and reports the reserve balance (sensing is work, C3.1b).",
+      "units": 4,
+      "requirement": [
+        { "resource": "money", "rule": { "kind": "constant", "value": 8 } },
+        { "resource": "staff-time", "rule": { "kind": "constant", "value": 30 } }
+      ],
+      "upkeep": [
+        { "resource": "money", "rule": { "kind": "constant", "value": 2 } },
+        { "resource": "staff-time", "rule": { "kind": "constant", "value": 5 } }
+      ],
+      "rank": { "layer": 1, "position": 1 },
+      "loadDials": {
+        "unitLossUnderShortfall": { "parameters": { "money": "1/2", "staff-time": "1/5" }, "note": "Hypothetical: units lost per unit of upkeep not covered (P-LOAD-01)." },
+        "unitRebuilding": { "parameters": { "perStep": "1/2", "money": "2" }, "note": "Hypothetical: at most 1/2 units rebuilt a step, at 2 of money each (P-LOAD-01)." }
+      }
+    },
+    {
+      "id": "scheduling",
+      "label": "Scheduling and rota team",
+      "units": 3,
+      "requirement": [
+        { "resource": "money", "rule": { "kind": "constant", "value": 6 } },
+        { "resource": "staff-time", "rule": { "kind": "constant", "value": 24 } }
+      ],
+      "upkeep": [
+        { "resource": "money", "rule": { "kind": "constant", "value": 1 } },
+        { "resource": "staff-time", "rule": { "kind": "constant", "value": 4 } }
+      ],
+      "rank": { "layer": 1, "position": 2 },
+      "loadDials": {
+        "unitLossUnderShortfall": { "parameters": { "money": "1/2", "staff-time": "1/5" }, "note": "Hypothetical: units lost per unit of upkeep not covered (P-LOAD-01)." },
+        "unitRebuilding": { "parameters": { "perStep": "1/4", "money": "4" }, "note": "Hypothetical: at most 1/4 units rebuilt a step, at 4 of money each (P-LOAD-01)." }
+      }
+    },
+    {
+      "id": "it-support",
+      "label": "IT support",
+      "units": 2,
+      "loads": [{ "id": "tickets", "unit": "tickets", "label": "Open support tickets (the backlog)" }],
+      "requirement": [
+        { "resource": "money", "rule": { "kind": "constant", "value": 10 } },
+        { "resource": "staff-time", "rule": { "kind": "linear", "base": 5, "terms": [{ "load": "tickets", "per": "1/2" }] } }
+      ],
+      "upkeep": [
+        { "resource": "money", "rule": { "kind": "constant", "value": 3 } },
+        { "resource": "staff-time", "rule": { "kind": "constant", "value": 2 } }
+      ],
+      "rank": { "layer": 2, "position": 1 },
+      "loadDials": {
+        "unitLossUnderShortfall": { "parameters": { "money": "1/6", "staff-time": "1/4" }, "note": "Hypothetical: units lost per unit of upkeep not covered (P-LOAD-01)." },
+        "unitRebuilding": { "parameters": { "perStep": "1/2", "money": "4" }, "note": "Hypothetical: at most 1/2 units rebuilt a step, at 4 of money each (P-LOAD-01)." }
+      }
+    }
+  ],
+  "dependencies": [
+    { "part": "finance", "feeds": "service" },
+    { "part": "scheduling", "feeds": "service" },
+    { "part": "it-support", "feeds": "finance" },
+    { "part": "it-support", "feeds": "scheduling" }
+  ],
+  "governor": {
+    "id": "governor",
+    "label": "Budget rules and statutory duties (hypothetical)",
+    "bands": [
+      { "level": "reserve-balance", "lower": 20, "upper": 60, "held": 40 },
+      { "level": "caseload-reported", "lower": 0, "upper": 120 },
+      { "level": "it-backlog", "lower": 0, "upper": 20, "held": 10 }
+    ],
+    "controls": {
+      "settings": [
+        "service-money", "finance-money", "scheduling-money", "it-money",
+        "service-money-pressure", "scheduling-money-pressure", "it-money-pressure", "it-money-low", "it-time"
+      ],
+      "stores": ["reserve"],
+      "routes": []
+    }
+  },
+  "levels": [
+    {
+      "id": "reserve-balance",
+      "label": "Reserve fund balance as reported by finance",
+      "unit": "GBP thousand",
+      "measures": { "of": "store-content", "store": "reserve" },
+      "producedBy": "finance",
+      "route": { "kind": "own-route" },
+      "missingSignal": "alarm",
+      "whenProducerShort": { "kind": "stops-when-short", "above": [{ "resource": "money", "amount": 2 }, { "resource": "staff-time", "amount": 5 }] },
+      "rationale": "Hypothetical. Finance measures the balance and reports it on a route of its own (a monthly report). The report stops once finance is short by more than 2 of money or 5 hours (sending dial, PROP-SENSE-01)."
+    },
+    {
+      "id": "caseload-reported",
+      "label": "Open cases as compiled by finance",
+      "unit": "cases",
+      "measures": { "of": "load", "part": "service", "load": "caseload" },
+      "producedBy": "finance",
+      "route": { "kind": "own-route" },
+      "missingSignal": "no-intervention",
+      "whenProducerShort": { "kind": "keeps-sending" },
+      "rationale": "Hypothetical. Held only in reserve-low mode, where no rule reads it: delivered but not actionable. Finance keeps compiling it when short (sending dial, PROP-SENSE-01)."
+    },
+    {
+      "id": "it-backlog",
+      "label": "IT support's own backlog report",
+      "unit": "tickets",
+      "measures": { "of": "load", "part": "it-support", "load": "tickets" },
+      "producedBy": "it-support",
+      "route": { "kind": "own-route" },
+      "missingSignal": "no-intervention",
+      "whenProducerShort": { "kind": "stops-when-short", "above": [{ "resource": "money", "amount": 0 }, { "resource": "staff-time", "amount": 0 }] },
+      "rationale": "Hypothetical. A low-ranked part reports its own backlog and stops reporting as soon as it is short. When the report is missing, the governor does not act (silence read as no intervention)."
+    }
+  ],
+  "indicators": [
+    { "id": "service-funding", "kind": "protected-flow", "watches": { "protectedFlow": true }, "label": "Money reaching the frontline service" },
+    { "id": "reserve-watch", "kind": "held-level", "watches": { "level": "reserve-balance" }, "label": "Reserve balance" },
+    { "id": "caseload-watch", "kind": "neither", "watches": { "measure": { "of": "load", "part": "service", "load": "caseload" } }, "label": "Open cases" }
+  ],
+  "settings": [
+    { "id": "service-money", "part": "service", "resource": "money", "kind": "governor-set", "rule": { "kind": "constant", "value": 70 } },
+    {
+      "id": "finance-money", "part": "finance", "resource": "money", "kind": "governor-set",
+      "rule": { "kind": "constant", "value": 8 },
+      "proposalData": { "P-ALLOC-01": { "grading": 1 } }
+    },
+    {
+      "id": "scheduling-money", "part": "scheduling", "resource": "money", "kind": "governor-set",
+      "rule": { "kind": "step", "reads": "reserve-balance", "below": 3, "steps": [{ "from": 20, "value": 6 }], "whenSilent": { "alarm": 3 } },
+      "proposalData": { "P-ALLOC-01": { "grading": 2 } }
+    },
+    {
+      "id": "it-money", "part": "it-support", "resource": "money", "kind": "governor-set",
+      "rule": {
+        "kind": "linear", "reads": "reserve-balance",
+        "points": [{ "at": 0, "value": 0 }, { "at": 20, "value": 5 }, { "at": 40, "value": 10 }, { "at": 100, "value": 10 }],
+        "whenSilent": { "alarm": 0 }
+      },
+      "proposalData": { "P-ALLOC-01": { "grading": 4 } }
+    },
+    { "id": "service-money-pressure", "part": "service", "resource": "money", "kind": "governor-set", "rule": { "kind": "constant", "value": 75 } },
+    {
+      "id": "scheduling-money-pressure", "part": "scheduling", "resource": "money", "kind": "governor-set",
+      "rule": { "kind": "step", "reads": "reserve-balance", "below": 4, "steps": [{ "from": 20, "value": 6 }], "whenSilent": { "alarm": 4 } },
+      "proposalData": { "P-ALLOC-01": { "grading": 2 } }
+    },
+    {
+      "id": "it-money-pressure", "part": "it-support", "resource": "money", "kind": "governor-set",
+      "rule": {
+        "kind": "linear", "reads": "reserve-balance",
+        "points": [{ "at": 0, "value": 2 }, { "at": 60, "value": 8 }, { "at": 100, "value": 8 }],
+        "whenSilent": { "alarm": 2 }
+      },
+      "proposalData": { "P-ALLOC-01": { "grading": 4 } }
+    },
+    {
+      "id": "it-money-low", "part": "it-support", "resource": "money", "kind": "governor-set",
+      "rule": { "kind": "constant", "value": 1 },
+      "proposalData": { "P-ALLOC-01": { "grading": 4 } }
+    },
+    {
+      "id": "service-time", "part": "service", "resource": "staff-time", "kind": "built-in",
+      "rule": { "kind": "constant", "value": 200 },
+      "rationale": "Hypothetical. Contracted hours are built in: the governor does not set them."
+    },
+    {
+      "id": "finance-time", "part": "finance", "resource": "staff-time", "kind": "built-in",
+      "rule": { "kind": "constant", "value": 30 }, "proposalData": { "P-ALLOC-01": { "grading": 1 } }
+    },
+    {
+      "id": "scheduling-time", "part": "scheduling", "resource": "staff-time", "kind": "built-in",
+      "rule": { "kind": "constant", "value": 20 }, "proposalData": { "P-ALLOC-01": { "grading": 2 } }
+    },
+    {
+      "id": "it-time", "part": "it-support", "resource": "staff-time", "kind": "governor-set",
+      "rule": { "kind": "step", "reads": "it-backlog", "below": 10, "steps": [{ "from": 20, "value": 20 }] },
+      "proposalData": { "P-ALLOC-01": { "grading": 4 } },
+      "rationale": "Hypothetical. More IT hours are approved once the reported backlog reaches 20 tickets." 
+    }
+  ],
+  "modes": [
+    {
+      "id": "normal", "label": "Normal settings",
+      "held": ["reserve-balance", "it-backlog"],
+      "settings": ["service-money", "finance-money", "scheduling-money", "it-money", "service-time", "finance-time", "scheduling-time", "it-time"]
+    },
+    {
+      "id": "pressure", "label": "Pressure settings (hypothetical management decision)",
+      "held": ["reserve-balance", "it-backlog"],
+      "settings": ["service-money-pressure", "finance-money", "scheduling-money-pressure", "it-money-pressure", "service-time", "finance-time", "scheduling-time", "it-time"]
+    },
+    {
+      "id": "reserve-low", "label": "Reserve-low mode, entered by a threshold switch: the governor also holds the caseload report",
+      "held": ["reserve-balance", "caseload-reported", "it-backlog"],
+      "settings": ["service-money-pressure", "finance-money", "scheduling-money-pressure", "it-money-low", "service-time", "finance-time", "scheduling-time", "it-time"]
+    }
+  ],
+  "initialMode": "normal",
+  "protectedFlow": {
+    "resource": "money",
+    "rationale": "Hypothetical. Money reaching the frontline service, measured against its requirement."
+  },
+  "routes": [
+    {
+      "id": "scheduling-money-route", "resource": "money", "from": "shared-flow", "to": "scheduling", "kind": "built-in",
+      "capacity": { "kind": "constant", "value": 5 },
+      "label": "Budget line to scheduling (hypothetical cap)"
+    }
+  ],
+  "stores": [
+    {
+      "id": "reserve", "resource": "money", "capacity": 60, "label": "Reserve fund",
+      "release": {
+        "kind": "governor-set",
+        "rule": { "kind": "step", "reads": "reserve-balance", "below": 0, "steps": [{ "from": 5, "value": 15 }], "whenSilent": { "alarm": 15 } }
+      },
+      "fill": { "kind": "built-in", "rule": { "kind": "constant", "value": 20 } }
+    }
+  ],
+  "outsideInputs": [
+    { "id": "grant", "resource": "money", "label": "One-off grant from beyond the boundary (hypothetical)" }
+  ],
+  "thresholdSwitches": [
+    {
+      "id": "reserve-low-switch", "level": "reserve-balance", "threshold": 20, "direction": "falling",
+      "fromMode": "pressure", "toMode": "reserve-low",
+      "label": "Reserve falls through 20: reserve-low settings (hypothetical)"
+    }
+  ]
+}

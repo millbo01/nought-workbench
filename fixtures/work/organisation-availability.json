@@ -1,0 +1,81 @@
+{
+  "attachmentVersion": "0.1.0",
+  "id": "organisation-availability",
+  "label": "Useful work, with IT support's systems availability enabling finance and scheduling (hypothetical)",
+  "rationale": "HYPOTHETICAL numbers, for James to review (decision 13). A step is a week. IT support's work is keeping the shared payment and rota systems up. Finance and scheduling both use the systems at the same time, and using them does not use them up, so each link is non-exclusive enablement (P-DEP-01): a cap on what the downstream part can do, with nothing taken from IT support. Finite IT tickets are not mapped this way: see organisation-shared-support. Service's work has no link; its dependencies on finance and scheduling stay rank-only.",
+  "model": "hypothetical-organisation",
+  "modelSha256": "ae6bd03159cd0f96fd798dc82c69b1411b06f24c74493e6880ce31ed8aa04816",
+  "proposals": [
+    { "id": "P-WORK-01", "version": "0.3" },
+    { "id": "P-DEP-01", "version": "0.3" }
+  ],
+  "works": [
+    {
+      "part": "it-support",
+      "work": "it-availability",
+      "workUnit": "system-hours",
+      "definition": "Hours in the week during which the shared payment and rota systems are up and supported, as logged by IT support's monitoring.",
+      "referenceOutputRule": { "kind": "constant", "value": 40 },
+      "recipe": [
+        { "resource": "staff-time", "perWorkUnit": "1/6" },
+        { "resource": "money", "perWorkUnit": "1/8" }
+      ],
+      "capacity": { "kind": "constant", "value": 168, "rationale": "A week has 168 hours: the systems cannot be up for more of it, whatever the number of IT staff." },
+      "yield": 1,
+      "rationale": "Reference output: the 40 working hours in which finance and scheduling use the systems. Recipe: monitoring and maintenance take 1/6 hour of IT staff time per system-hour, and licences and hosting 1/8 thousand per system-hour, so the 8 hours and 7 thousand left after upkeep keep the systems up for 48 and 56 hours."
+    },
+    {
+      "part": "finance",
+      "work": "finance-payments",
+      "workUnit": "payments",
+      "definition": "Supplier and staff payments completed and released in the week.",
+      "referenceOutputRule": { "kind": "constant", "value": 100 },
+      "recipe": [{ "resource": "staff-time", "perWorkUnit": "1/4" }],
+      "capacity": { "kind": "per-unit", "perUnit": 30 },
+      "yield": 1,
+      "rationale": "A quarter hour of staff time per payment; each finance officer can complete at most 30 payments a week."
+    },
+    {
+      "part": "scheduling",
+      "work": "scheduling-appointments",
+      "workUnit": "appointments",
+      "definition": "Appointments booked onto the rota in the week.",
+      "referenceOutputRule": { "kind": "constant", "value": 60 },
+      "recipe": [{ "resource": "staff-time", "perWorkUnit": "1/4" }],
+      "capacity": { "kind": "per-unit", "perUnit": 30 },
+      "yield": 1,
+      "rationale": "A quarter hour of staff time per appointment; each scheduler can book at most 30 a week. Scheduling is short of staff time at every step, so without P-LOAD-01 its unit count, and with it this per-unit capacity, is refused after step 0 (Q-016, decision 3)."
+    },
+    {
+      "part": "service",
+      "work": "service-cases",
+      "workUnit": "cases",
+      "definition": "Open cases closed in the week.",
+      "referenceOutputRule": { "kind": "linear", "base": 0, "terms": [{ "load": "caseload", "per": "1/5" }] },
+      "recipe": [{ "resource": "staff-time", "perWorkUnit": 5 }],
+      "capacity": { "kind": "per-unit", "perUnit": 1 },
+      "yield": "9/10",
+      "rationale": "Reference output: a fifth of the open caseload closed each week. The benchmark recipe is 5 staff hours per case; this office's measured yield against it is 9/10."
+    }
+  ],
+  "links": [
+    {
+      "part": "it-support",
+      "feeds": "finance",
+      "workUnits": { "part": "system-hours", "feeds": "payments" },
+      "ratio": "1/4",
+      "lagSteps": 0,
+      "semantics": "non-exclusive-enablement",
+      "rationale": "The payment system completes at most 4 payments per hour it is up: a quarter system-hour per payment. Its being up is not used up by finance and serves scheduling at the same time."
+    },
+    {
+      "part": "it-support",
+      "feeds": "scheduling",
+      "workUnits": { "part": "system-hours", "feeds": "appointments" },
+      "ratio": "1/2",
+      "lagSteps": 0,
+      "semantics": "non-exclusive-enablement",
+      "rationale": "The rota system books at most 2 appointments per hour it is up: half a system-hour per appointment, shared with finance's use, not divided."
+    }
+  ]
+}

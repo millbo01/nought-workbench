@@ -1,0 +1,96 @@
+{
+  "schemaVersion": "0.4.0",
+  "id": "two-step-casework",
+  "label": "A one-team casework office (hypothetical, two steps)",
+  "rationale": "Hypothetical reference fixture for P-LOAD-02 (tracking only); illustrative numbers. One part, the top, with one resource (staff hours) and one load (the cases it has on hand in the step). It reproduces acceptance test T01 of the P-LOAD-02 handoff.",
+  "resources": [
+    {
+      "id": "hours",
+      "unit": "hours",
+      "storable": false,
+      "label": "Staff hours: hours in a step cannot be held for the next"
+    }
+  ],
+  "boundary": {
+    "id": "boundary",
+    "top": "casework"
+  },
+  "parts": [
+    {
+      "id": "casework",
+      "label": "Casework team",
+      "units": 1,
+      "loads": [
+        {
+          "id": "cases-on-hand",
+          "unit": "cases",
+          "label": "Cases the team has on hand in the step"
+        }
+      ],
+      "requirement": [
+        {
+          "resource": "hours",
+          "rule": {
+            "kind": "constant",
+            "value": 10
+          }
+        }
+      ],
+      "upkeep": [
+        {
+          "resource": "hours",
+          "rule": {
+            "kind": "constant",
+            "value": 2
+          }
+        }
+      ],
+      "rank": {
+        "position": 1
+      }
+    }
+  ],
+  "dependencies": [],
+  "governor": {
+    "id": "governor",
+    "bands": [],
+    "controls": {
+      "settings": [
+        "casework-access"
+      ],
+      "stores": [],
+      "routes": []
+    }
+  },
+  "levels": [],
+  "indicators": [],
+  "settings": [
+    {
+      "id": "casework-access",
+      "part": "casework",
+      "resource": "hours",
+      "kind": "governor-set",
+      "rule": {
+        "kind": "constant",
+        "value": 20
+      }
+    }
+  ],
+  "modes": [
+    {
+      "id": "normal",
+      "held": [],
+      "settings": [
+        "casework-access"
+      ]
+    }
+  ],
+  "initialMode": "normal",
+  "protectedFlow": {
+    "resource": "hours"
+  },
+  "routes": [],
+  "stores": [],
+  "outsideInputs": [],
+  "thresholdSwitches": []
+}
