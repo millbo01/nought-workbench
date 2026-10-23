@@ -28,7 +28,9 @@ import { sha256OfString } from "../../core/sha256.js";
 import { traceHash } from "../../core/trace.js";
 import { ENGINE_VERSION, SCHEMA_VERSION } from "../../core/version.js";
 import { validateWorkAttachment } from "../work/attachment.js";
-import { runWork } from "../work/run-work.js";
+import { resolveMultiwork, runWork } from "../work/run-work.js";
+import { checkMultiworkAccounts } from "../multiwork/attachment.js";
+import { outstandingBounds } from "../multiwork/bound.js";
 import { WORK_VERSION, workTraceHash } from "../work/trace.js";
 import { BACKLOG_PROPOSAL, claimsOf, validateBacklogAttachment } from "./attachment.js";
 import { BACKLOG_VERSION } from "./trace.js";
@@ -309,9 +311,17 @@ export function runBacklog(modelDoc, scenarioDoc, workAttachmentDoc, backlogAtta
     const wv = validateWorkAttachment(workAttachmentDoc, mv.model, modelSha256);
     if (!wv.ok || !wv.attachment)
         throw new ModelInvalidError('work attachment', wv.issues);
-    const bv = validateBacklogAttachment(backlogAttachmentDoc, mv.model, modelSha256, wv.attachment, sha256OfString(canonicalJson(workAttachmentDoc)));
+    const workSha256 = sha256OfString(canonicalJson(workAttachmentDoc));
+    const bv = validateBacklogAttachment(backlogAttachmentDoc, mv.model, modelSha256, wv.attachment, workSha256);
     if (!bv.ok || !bv.attachment)
         throw new ModelInvalidError('backlog attachment', bv.issues);
+    const multiwork = resolveMultiwork(options, mv.model, modelSha256, wv.attachment, workSha256);
+    if (multiwork) {
+        const issues = checkMultiworkAccounts(multiwork.attachment, bv.attachment);
+        if (issues.some((i) => i.severity === 'error'))
+            throw new ModelInvalidError('multiwork attachment', issues);
+    }
     const { base, work } = runWork(modelDoc, scenarioDoc, workAttachmentDoc, options);
-    return { base, work, backlog: backlogFromTraces(base, work, bv.attachment, sha256OfString(canonicalJson(backlogAttachmentDoc))) };
+    const backlog = backlogFromTraces(base, work, bv.attachment, sha256OfString(canonicalJson(backlogAttachmentDoc)));
+    return { base, work, backlog, ...(multiwork ? { multiwork: outstandingBounds(wv.attachment, multiwork, work, backlog) } : {}) };
 }

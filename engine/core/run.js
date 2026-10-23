@@ -20,7 +20,7 @@
 // A calculation that cannot be made is refused inside the result, with typed
 // refusals, and everything computed from it is refused too.
 import { canonicalJson } from "./canonical-json.js";
-import { checkDraw } from "./draw.js";
+import { checkDraw, drawUnknownTop, UNKNOWN_TOP_VERSION } from "./draw.js";
 import { AccountingError, ConfigurationError, ModelInvalidError } from "./errors.js";
 import { quantity } from "./quantity.js";
 import * as Q from "./rational.js";
@@ -598,8 +598,14 @@ export function startRun(model, scenario, options, hashes) {
                 const s = settingOf(pr.part, pr.resource);
                 // The top never changes within a boundary (C4.4a), so only parts below it can move.
                 if (!Q.eq(req.v, prev.v) && s?.kind === 'built-in' && pr.part !== topId) {
-                    orderRefusals = mergeRefusals(orderRefusals, [U.placeAfterRequirementChange(pr.part, pr.resource)]);
-                    flags.push({ code: 'built-in-requirement-changed', subject: pr.part, detail: `requirement for '${pr.resource}' changed under a built-in setting: its place may move (Q-006)`, canon: 'C3.7' });
+                    if (topId === null) {
+                        // With the top unknown the order is refused because the top is not known; the part may be the top, whose place never moves.
+                        flags.push({ code: 'built-in-requirement-changed', subject: pr.part, detail: `requirement for '${pr.resource}' changed under a built-in setting: its place may move (Q-006), unless it is the top, which is an information gap and whose place never moves (C4.4a)`, canon: 'C3.7' });
+                    }
+                    else {
+                        orderRefusals = mergeRefusals(orderRefusals, [U.placeAfterRequirementChange(pr.part, pr.resource)]);
+                        flags.push({ code: 'built-in-requirement-changed', subject: pr.part, detail: `requirement for '${pr.resource}' changed under a built-in setting: its place may move (Q-006)`, canon: 'C3.7' });
+                    }
                 }
             }
         }
@@ -625,6 +631,8 @@ export function startRun(model, scenario, options, hashes) {
         const releaseV = new Map();
         const enteringV = new Map();
         const drawn = new Map();
+        // PROP-TOP-01: how each resource's draw was settled while the top is an information gap (never with a known top).
+        const unknownTopOf = new Map();
         for (const res of resources) {
             const series = scenario.inflow.find((x) => x.resource === res);
             const inflow = seriesAt(series.entries, t, `$.inflow.${res}`);
@@ -638,6 +646,13 @@ export function startRun(model, scenario, options, hashes) {
             const entering = attempt(() => Q.add(Q.add(need(inflow), need(outside)), need(rel)));
             enteringV.set(res, entering);
             const drawing = ranked.filter((id) => settingOf(id, res) !== undefined);
+            if (topId === null) {
+                // Replaced below once the draw is reached; until then something it needs was refused.
+                unknownTopOf.set(res, {
+                    proposal: 'PROP-TOP-01', version: UNKNOWN_TOP_VERSION, top: 'unknown', policy: policy?.proposalId ?? null,
+                    candidates: [], identical: null, committedDrawsFit: null, result: 'refused', reason: 'prerequisite-refused',
+                });
+            }
             drawn.set(res, attempt(() => {
                 const rr = resourceRefusals.get(res);
                 if (rr && rr.length > 0)
@@ -664,9 +679,18 @@ export function startRun(model, scenario, options, hashes) {
                     };
                 });
                 const drawStores = storesOfRes.map((s) => ({ store: s.id, fillRoom: quantity(res, need(fillRoom.get(s.id))) }));
-                if (isGap(top))
-                    refuse(unknownPrerequisite('$.boundary.top', top.note));
                 const input = { resource: res, entering: quantity(res, need(entering)), parts, stores: drawStores };
+                if (isGap(top)) {
+                    // PROP-TOP-01 (decision Q3, 2026-10-22): the draw is stated only where it is the same under every candidate top.
+                    const u = drawUnknownTop(policy, input, unknownPrerequisite('$.boundary.top', top.note));
+                    unknownTopOf.set(res, u.record);
+                    const d = need(u.drawn);
+                    return {
+                        received: new Map(d.result.received.map((x) => [x.part, x.amount.value])),
+                        filled: new Map(d.result.filled.map((x) => [x.store, x.amount.value])),
+                        unused: d.unused,
+                    };
+                }
                 const result = policy.draw(input);
                 const checked = checkDraw(policy, input, result);
                 if ('refusal' in checked)
@@ -918,6 +942,8 @@ export function startRun(model, scenario, options, hashes) {
                     gap: tv('computed', gap, t), metFromStores: tv('computed', fromStores, t),
                     metFromOutside: tv('computed', fromOutside, t), leftUnmet: tv('computed', unmet, t),
                 },
+                // Only while the top is an information gap: a known-top record has no such member.
+                ...(topId === null ? { unknownTop: unknownTopOf.get(res) } : {}),
             });
         }
         // Shortness per part this step (any resource), and units for the next step (C3.13d, C7.3).
@@ -996,7 +1022,8 @@ export function startRun(model, scenario, options, hashes) {
             }
         }
         // Decision Q-017: a part with no path to the top sits in the bottom layer; flag it where it keeps its
-        // access while a part ranked above it is cut.
+        // access while a part ranked above it is cut. Only under a known top: where the layers are not derived,
+        // no part is unreached (rank.ts).
         const committedOf = (key) => attempt(() => {
             const rc = routeCap.get(key);
             return rc === undefined ? need(access.get(key)) : Q.min(need(access.get(key)), need(rc));
@@ -1012,6 +1039,9 @@ export function startRun(model, scenario, options, hashes) {
         for (const u of layers.unreached) {
             for (const res of resources) {
                 const key = k2(u, res);
+                // Only a resource the part draws (it states a requirement on it): it has no access to any other.
+                if (!received.has(key))
+                    continue;
                 const rec = received.get(key);
                 const cap = committedOf(key);
                 if (!rec?.ok || !cap.ok || !Q.eq(rec.v, cap.v) || lowered(key) !== false)
@@ -1107,6 +1137,9 @@ export function startRun(model, scenario, options, hashes) {
         const proposals = new Set(CORE_PROPOSALS);
         if (policy)
             proposals.add(policy.proposalId);
+        // PROP-TOP-01 is in force in every run whose top is an information gap and whose policy declares it.
+        if (topId === null && policy?.unknownTop === 'evaluate-admissible-tops')
+            proposals.add('PROP-TOP-01');
         if (model.stores.length > 0)
             proposals.add('PROP-STORE-01');
         if (usesLevels)

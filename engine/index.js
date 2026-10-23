@@ -2,7 +2,7 @@
 // (nought-engine/proposals), and draft IPF types another (nought-engine/draft).
 export { attempt, need, refuse, REFUSAL_CATEGORIES, unknownPrerequisite } from "./core/refusal.js";
 export { canonicalJson } from "./core/canonical-json.js";
-export { checkDraw } from "./core/draw.js";
+export { checkDraw, UNKNOWN_TOP_VERSION } from "./core/draw.js";
 export { AccountingError, ConfigurationError, ModelInvalidError, ResourceMismatchError } from "./core/errors.js";
 export * as quantity from "./core/quantity.js";
 export * as rational from "./core/rational.js";

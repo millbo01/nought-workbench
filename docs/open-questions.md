@@ -2,7 +2,7 @@
 
 Questions the engine cannot answer from CANON, logged as they arose. Each calculation that needs an answer is refused inside the result with a typed refusal carrying the question id (src/core/unspecified.ts), or rests on a named proposal (docs/proposals.md). Live questions are asked in the build reports, in full, with their context; this file is the log. Nothing here is decided until James decides it, and an answer goes into CANON or a proposal, never into this file.
 
-Format: the status; the question; the case that raised it; what it blocks; how the engine handled it meanwhile. Statuses (2026-10-20): answered Q-002, Q-004, Q-008, Q-010, Q-016, Q-017, Q-023; kept open Q-005, Q-006, Q-009, Q-011, Q-012, Q-013, Q-018, Q-019, Q-020, Q-021, Q-022, Q-025, Q-026; parked Q-001, Q-003, Q-007, Q-014, Q-015, Q-024; open, not yet ruled on, Q-027 to Q-031; raised by the work extension, open, WQ-01 to WQ-07 (below).
+Format: the status; the question; the case that raised it; what it blocks; how the engine handled it meanwhile. Statuses (2026-10-20): answered Q-002, Q-004, Q-008, Q-010, Q-016, Q-017, Q-023; kept open Q-005, Q-006, Q-009, Q-011, Q-012, Q-013, Q-018, Q-019, Q-020, Q-021, Q-022, Q-025, Q-026; parked Q-001, Q-003, Q-007, Q-014, Q-015, Q-024; open, not yet ruled on, Q-027 to Q-031; raised by the work extension, open, WQ-01 to WQ-07; recorded 2026-10-21 and answered the same day, WQ-08 (below).
 
 ## Raised in Phase 1 (2026-10-20)
 
@@ -245,3 +245,14 @@ Questions about the optional proposals P-WORK-01 and P-DEP-01 (docs/proposals.md
 - **Case:** no fixture uses them.
 - **Blocks:** nothing.
 - **Meanwhile:** kept in schema 0.4.0, never read, marked superseded.
+
+### WQ-08. Several kinds of work on one part, sharing one productive balance
+- **Status:** answered: the scope (`wq-08-scope.md`) was approved by James on 2026-10-21 with three refinements, and implemented as P-MULTIWORK-01, first release (`p-multiwork-01-report.md`).
+- **Question:** what is the smallest optional, sector-neutral work extension that lets one part do several kinds of work against one finite productive-capacity balance (what remains for work after upkeep), under an explicitly mapped work-allocation arrangement? Each kind of work has its own demand, completion rate and waiting list. The arrangement could be fixed shares, priorities, or another supported rule.
+- **Case:** Kestrel's Estates & IT Services, one part that installs equipment and does break-fix repairs (`shared-staff-hours-assessment.md`, Part I).
+- **Blocks:** the completions, waiting lists and handovers of each kind of work, wherever several kinds share one part's hours (P-WORK-01, decision 8).
+- **Meanwhile:**
+  - each workflow's What-if runs separately, with a shared-resource warning;
+  - no combined figure is shown;
+  - an unknown arrangement is never defaulted (no placeholder grading, inferred top or invented scheduling rule);
+  - the part's own insufficiency in hours can be stated without saying which work is deferred.

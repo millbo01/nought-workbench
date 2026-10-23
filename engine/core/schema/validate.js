@@ -278,6 +278,13 @@ export function validateModelStructure(model) {
     for (const id of layers.unreached) {
         r.flag(`$.parts.${id}`, 'rank-unreached', `part '${id}' has no dependency path to the top, so it sits in the bottom layer (decision Q-017); the trace flags it if it keeps its access while higher-ranked parts are cut`, 'C4.3a');
     }
+    // Not deriving the layers is not the same as a part being unreached: nothing is assumed in place of the top.
+    if (isGap(top)) {
+        r.flag('$.boundary.top', 'rank-underived', 'dependency layers cannot be derived while the top is an information gap: no part is placed in a layer or called unreached, and the order and the protected flow are refused (decision Q-017 applies only under a known top); a draw is stated only where it is the same under every candidate top, under a policy that declares PROP-TOP-01', 'C4.3a', 'PROP-TOP-01');
+    }
+    else if (partById.get(top)?.setsOwnAccess) {
+        r.flag('$.boundary.top', 'rank-underived', 'dependency layers cannot be derived because the top sets its own access (a separate case): no part is placed in a layer or called unreached', 'C4.3a, C3.5');
+    }
     // ---- governor (C2.2)
     const levelById = new Map(model.levels.map((l) => [l.id, l]));
     const bandLevels = new Set();

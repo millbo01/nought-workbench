@@ -1,6 +1,6 @@
 # Nought Engine: handover
 
-A self-contained description of the Nought Engine as built, for a model that has not seen the repository. It reflects engine 0.4.0 and schema 0.4.0 (2026-10-20), after James's answers to the first open questions, his approval of P-LOAD-01's form, the 0.4.0 migration (docs/decisions.md, decision 12: the versions, and loads required to be non-negative), the optional work extension P-WORK-01 and P-DEP-01 (approved 2026-10-20 as optional modelling proposals, not CANON), the tracking-only backlog ledger P-LOAD-02 (approved 2026-10-20, an optional proposal), and the coupled backlog feedback P-COUPLE-01 0.1 (the v0.3 design resolutions, approved, and its implementation authorised 2026-10-20; an optional proposal, on its own entry point `runCoupled`).
+A self-contained description of the Nought Engine as built, for a model that has not seen the repository. It reflects engine 0.4.0 and schema 0.4.0 (2026-10-20), after James's answers to the first open questions, his approval of P-LOAD-01's form, the 0.4.0 migration (docs/decisions.md, decision 12: the versions, and loads required to be non-negative), the optional work extension P-WORK-01 and P-DEP-01 (approved 2026-10-20 as optional modelling proposals, not CANON), the tracking-only backlog ledger P-LOAD-02 (approved 2026-10-20, an optional proposal), the coupled backlog feedback P-COUPLE-01 0.1 (the v0.3 design resolutions, approved, and its implementation authorised 2026-10-20; an optional proposal, on its own entry point `runCoupled`), the carryable cross-stage handovers P-HANDOFF-01 0.1 (approved in principle and its first release authorised 2026-10-21; an optional work-accounting proposal on its own entry point `runHandoff`, built from the unchanged runners), and several works on one part, P-MULTIWORK-01 0.1 (approved 2026-10-21; an optional work-layer proposal given to the work runners through their options), and allocation under an unknown top, PROP-TOP-01 0.1.0 (decision Q3, 2026-10-22; an engine proposal in the core loop, in force only where the top is an information gap and the allocation policy declares it).
 
 **Ground rules:**
 - The specification is CANON.md (SHA-256 `dd3a6ccaa20db6760364320617447824794134190249d1e974ea126fde351266`). It wins over this file and over everything in the code.
@@ -37,7 +37,7 @@ These are the compiler's declaration files for every module reachable from the t
 export { attempt, need, refuse, REFUSAL_CATEGORIES, unknownPrerequisite } from './core/refusal.ts';
 export type { Refusal, RefusalCategory, V } from './core/refusal.ts';
 export { canonicalJson } from './core/canonical-json.ts';
-export { checkDraw } from './core/draw.ts';
+export { checkDraw, UNKNOWN_TOP_VERSION } from './core/draw.ts';
 export type { DrawInput, DrawPart, DrawPolicy, DrawResult, DrawStore } from './core/draw.ts';
 export { AccountingError, ConfigurationError, ModelInvalidError, ResourceMismatchError } from './core/errors.ts';
 export type { Issue } from './core/errors.ts';
@@ -53,7 +53,7 @@ export { isGap } from './core/schema/types.ts';
 export { validateModel, validateScenario } from './core/schema/validate.ts';
 export { sha256Hex, sha256OfString, utf8 } from './core/sha256.ts';
 export { canonicalTrace, traceHash } from './core/trace.ts';
-export type { LevelRecord, ResourceRecord, RunStamp, RunTrace, Snapshot, StepRecord, TV } from './core/trace.ts';
+export type { LevelRecord, ResourceRecord, RunStamp, RunTrace, Snapshot, StepRecord, TV, UnknownTopDraw, UnknownTopReason } from './core/trace.ts';
 export { OPEN_QUESTIONS } from './core/unspecified.ts';
 export * as unspecified from './core/unspecified.ts';
 export { CANON_FINGERPRINT, ENGINE_VERSION, engineMeta, SCHEMA_VERSION } from './core/version.ts';
@@ -596,6 +596,54 @@ export interface ResourceRecord {
         readonly metFromOutside: TV;
         readonly leftUnmet: TV;
     };
+    /** PROP-TOP-01: how this resource's draw was settled while the top is an information gap. Absent when the top is known. */
+    readonly unknownTop?: UnknownTopDraw | undefined;
+}
+/** Why a draw was refused while the top is an information gap (PROP-TOP-01). */
+export type UnknownTopReason = 
+/** Every candidate top gave a valid result, and the results differ: the draw depends on the top. */
+'results-differ'
+/** The policy refused, or broke a limit, under at least one candidate top, and not alike under all of them. */
+ | 'candidate-refused'
+/** The policy refused alike under every candidate top: the refusal does not depend on the top, and stands as it is. */
+ | 'refused-alike'
+/** The policy does not declare that it may be evaluated under candidate tops, so it was not called. */
+ | 'policy-not-declared'
+/** Something the draw needs was refused first: the mode, the policy, the order (for a policy that reads rank), access, a route, fill room or what entered. */
+ | 'prerequisite-refused';
+/**
+ * PROP-TOP-01 (an engine proposal, not a CANON rule; decision Q3, 2026-10-22):
+ * how one resource's draw in one step was settled while the top is an
+ * information gap. A computed draw is the same under every candidate top, so
+ * it establishes nothing about which part is the top: the order and the
+ * protected flow stay refused, and nothing here is a protected-top allocation.
+ */
+export interface UnknownTopDraw {
+    readonly proposal: 'PROP-TOP-01';
+    /** The version of PROP-TOP-01's evaluation (UNKNOWN_TOP_VERSION). */
+    readonly version: string;
+    /** The top is an information gap: the record exists only then. */
+    readonly top: 'unknown';
+    /** The allocation policy in force (its proposal id), or null where none was given. */
+    readonly policy: string | null;
+    /**
+     * The candidate tops evaluated, in order: each part claiming the resource, by
+     * id, then null for a top elsewhere in the boundary (a part that does not
+     * claim it, or one the mapping does not contain). Each says whether the
+     * policy gave a valid result under it. Empty where none was evaluated.
+     */
+    readonly candidates: readonly {
+        readonly top: Id | null;
+        readonly result: 'valid' | 'refused';
+    }[];
+    /** Whether the valid results are all the same (receipts, fills and the unused amount); null where no candidate gave one. */
+    readonly identical: boolean | null;
+    /** Whether the committed draws fit what entered, so that decision Q-002 fixes every receipt whatever the top; null where the draw was not reached. */
+    readonly committedDrawsFit: boolean | null;
+    /** Computed only where every candidate gave a valid result and all are the same. */
+    readonly result: 'computed' | 'refused';
+    /** Why the draw was refused; null where it was computed. */
+    readonly reason: UnknownTopReason | null;
 }
 export interface StoreRecord {
     readonly store: Id;
@@ -745,8 +793,9 @@ export declare function unknownV<T>(path: string, note: string): V<T>;
 ```ts
 import type { Rational } from './rational.ts';
 import type { Quantity } from './quantity.ts';
-import type { Refusal } from './refusal.ts';
+import type { Refusal, V } from './refusal.ts';
 import type { Id } from './schema/types.ts';
+import type { UnknownTopDraw } from './trace.ts';
 export interface DrawPart {
     readonly part: Id;
     readonly isTop: boolean;
@@ -794,14 +843,51 @@ export interface DrawPolicy {
     readonly proposalId: string;
     readonly readsRequirement: boolean;
     readonly readsRank: boolean;
+    /**
+     * PROP-TOP-01 (an engine proposal, not a CANON rule; decision Q3, 2026-10-22).
+     * A policy that declares 'evaluate-admissible-tops' states that `draw` is
+     * deterministic, has no side effects and does not change its input, so it is
+     * safe to call several times in a step. While the top is an information gap,
+     * the core then calls it once for each candidate top, with nothing but
+     * `isTop` varying between the calls, and states the draw only where every
+     * result is valid and the same. A policy that does not declare it is never
+     * called while the top is a gap: its draws are refused, as before. Nothing
+     * outside the policy can declare it on the policy's behalf.
+     */
+    readonly unknownTop?: 'evaluate-admissible-tops' | undefined;
     /** May leave with refusals (for example missing proposal data), using `refuse` from the core. */
     draw(input: DrawInput): DrawResult;
 }
+/** The version of PROP-TOP-01's evaluation, recorded in each unknown-top record. */
+export declare const UNKNOWN_TOP_VERSION = "0.1.0";
 /** Check a policy's result. Returns the unused amount, or the refusal for a broken limit. */
 export declare function checkDraw(policy: DrawPolicy, input: DrawInput, result: DrawResult): {
     unused: Rational;
 } | {
     refusal: Refusal;
+};
+/** A policy's result for one resource, checked: what each part received and each store took, and what was left. */
+export interface CheckedDraw {
+    readonly result: DrawResult;
+    readonly unused: Rational;
+}
+/**
+ * PROP-TOP-01 (an engine proposal, not a CANON rule; decision Q3, 2026-10-22):
+ * one resource's draw while the top is an information gap. `input` is the
+ * draw as the core gives it, with no part marked as the top. The candidate
+ * tops are each claiming part, by id, then a top elsewhere in the boundary
+ * (no claiming part marked): one case among the others, never a default. A
+ * policy that declares 'evaluate-admissible-tops' is called once for each,
+ * with only `isTop` varying, and each result is checked as any draw is. The
+ * draw is stated only where every candidate gives a valid result and all are
+ * the same: every receipt, every fill and the unused amount. Otherwise it is
+ * refused for the top (`topGap`), with whatever the policy refused; or, where
+ * the policy refused alike under every candidate, with those refusals alone,
+ * since they do not depend on the top. An undeclared policy is not called.
+ */
+export declare function drawUnknownTop(policy: DrawPolicy, input: DrawInput, topGap: Refusal): {
+    readonly drawn: V<CheckedDraw>;
+    readonly record: UnknownTopDraw;
 };
 ```
 
@@ -1014,14 +1100,16 @@ export declare function qIsNegative(a: Quantity): boolean;
 ```ts
 import type { Id, Model } from './schema/types.ts';
 export interface Layers {
-    /** Layer per ranked part, the unreached parts included (in the bottom layer). */
+    /** Layer per ranked part, the unreached parts included (in the bottom layer). Empty where the layers are not derived. */
     readonly layer: ReadonlyMap<Id, number>;
     /** The bottom layer. */
     readonly bottom: number;
-    /** Parts with no dependency path to the top, placed in the bottom layer (decision Q-017). */
+    /** Parts with no dependency path to the top, placed in the bottom layer (decision Q-017). Empty where the layers are not derived. */
     readonly unreached: readonly Id[];
     /** Separate cases (C3.5): excluded from ranking. */
     readonly separate: readonly Id[];
+    /** Whether the layers could be derived: false where the top is an information gap or is not a ranked part. */
+    readonly derived: boolean;
 }
 export declare function deriveLayers(model: Model): Layers;
 ```
@@ -1102,15 +1190,26 @@ export type { BindingImpact, CouplingAttachment, CouplingBinding, CouplingValida
 export { couplingReplayScenario, runCoupled } from './couple/run-coupled.ts';
 export { COUPLE_VERSION, couplingTraceHash } from './couple/trace.ts';
 export type { CouplingBindingStamp, CouplingRecord, CouplingRunStamp, CouplingStepRecord, CouplingTrace, RefusalPath, RefusalPathEntry } from './couple/trace.ts';
+export { checkHandoffAttachment, handoffAnalysis, HANDOFF_ATTACHMENT_VERSION, HANDOFF_PROPOSAL, handoverClaims, handoverConditions, parseHandoffAttachment, reachOf, validateHandoffAttachment } from './handoff/attachment.ts';
+export type { Availability, HandoffAttachment, HandoffValidation, Handover, HandoverAnalysis, HandoverClaim } from './handoff/attachment.ts';
+export { runHandoff } from './handoff/run-handoff.ts';
+export { HANDOFF_VERSION, handoffTraceHash } from './handoff/trace.ts';
+export type { HandoffRunStamp, HandoffStepRecord, HandoffTrace, HandoverRecord, HandoverStamp } from './handoff/trace.ts';
+export { checkMultiworkAccounts, checkMultiworkAttachment, MULTIWORK_ATTACHMENT_VERSION, MULTIWORK_PROPOSAL, parseMultiworkAttachment, scheduleAt, validateMultiworkAttachment } from './multiwork/attachment.ts';
+export type { ArrangedWork, Arrangement, MultiworkAttachment, MultiworkValidation, PartArrangement, ScheduleEntry, Shares, Unused } from './multiwork/attachment.ts';
+export { outstandingBounds } from './multiwork/bound.ts';
+export { MULTIWORK_VERSION } from './multiwork/trace.ts';
+export type { AllocationRecord, AllocationWorkRecord, MultiworkTrace, OutstandingCondition, OutstandingRecord } from './multiwork/trace.ts';
 export { checkWorkAttachment, parseWorkAttachment, validateWorkAttachment, WORK_ATTACHMENT_VERSION, WORK_PROPOSALS } from './work/attachment.ts';
 export type { CapacityRule, FunctionalLink, LinkSemantics, RecipeEntry, WorkAttachment, WorkMapping, WorkValidation } from './work/attachment.ts';
-export { runWork, workFromTrace } from './work/run-work.ts';
+export { resolveMultiwork, runWork, workFromTrace } from './work/run-work.ts';
+export type { MultiworkSource, WorkRunOptions } from './work/run-work.ts';
 export { WORK_VERSION, workTraceHash } from './work/trace.ts';
 export type { BindingRecord, FunctionalLinkRecord, WorkRecord, WorkResourceRecord, WorkRunStamp, WorkStepRecord, WorkTrace } from './work/trace.ts';
 export interface ProposalEntry {
     readonly id: string;
     readonly title: string;
-    readonly where: 'core loop' | 'schema' | 'policy' | 'check' | 'work extension' | 'tracking extension' | 'coupling extension';
+    readonly where: 'core loop' | 'schema' | 'policy' | 'check' | 'work extension' | 'tracking extension' | 'coupling extension' | 'handover extension' | 'multiwork extension';
     /** Whether this engine can run it at all. Disabled proposals cannot be enabled. */
     readonly enabled: boolean;
     readonly inForce: string;
@@ -1126,7 +1225,12 @@ import type { DrawPolicy } from '../core/draw.ts';
 import type { Issue } from '../core/errors.ts';
 import type { Model } from '../core/schema/types.ts';
 export declare const P_ALLOC_01 = "P-ALLOC-01";
-/** P-ALLOC-01 as an allocation policy. Pass it explicitly; the core never uses it by default. */
+/**
+ * P-ALLOC-01 as an allocation policy. Pass it explicitly; the core never uses it by default.
+ * It declares PROP-TOP-01's evaluation: `draw` is pure (no I/O, state or randomness,
+ * checked by tests/static.test.ts) and reads nothing but its input, so with the top an
+ * information gap the core may call it once for each candidate top. Its rule is unchanged.
+ */
 export declare const gradedAllocation: DrawPolicy;
 /**
  * Proposal checks for P-ALLOC-01's data (flags, never errors): every setting of
@@ -1231,6 +1335,7 @@ export declare function validateWorkAttachment(doc: unknown, model: T.Model, mod
 ```ts
 import type { Id } from '../../core/schema/types.ts';
 import type { RefusalSummary, TV } from '../../core/trace.ts';
+import type { AllocationRecord } from '../multiwork/trace.ts';
 export declare const WORK_VERSION = "0.1.0";
 export interface WorkRunStamp {
     readonly workVersion: string;
@@ -1265,6 +1370,18 @@ export interface WorkRunStamp {
         readonly id: string;
         readonly version: string;
     }[];
+    /** Only in a run that uses a P-MULTIWORK-01 arrangement: its attachment and proposal. */
+    readonly multiwork?: {
+        readonly proposal: {
+            readonly id: string;
+            readonly version: string;
+        };
+        readonly attachment: {
+            readonly id: Id;
+            readonly version: string;
+            readonly sha256: string;
+        };
+    };
 }
 export interface WorkResourceRecord {
     readonly resource: Id;
@@ -1329,6 +1446,8 @@ export interface WorkStepRecord {
     readonly mode: Id | null;
     readonly works: readonly WorkRecord[];
     readonly links: readonly FunctionalLinkRecord[];
+    /** Only in a run that uses a P-MULTIWORK-01 arrangement: one record per arranged part. */
+    readonly allocations?: readonly AllocationRecord[];
 }
 export interface WorkTrace {
     readonly stamp: WorkRunStamp;
@@ -1352,6 +1471,7 @@ import type * as T from '../../core/schema/types.ts';
 import type { RunTrace, StepRecord } from '../../core/trace.ts';
 import type { WorkAttachment } from './attachment.ts';
 import type { WorkStepRecord, WorkTrace } from './trace.ts';
+import type { MultiworkAttachment } from '../multiwork/attachment.ts';
 /**
  * Where a work step reads a load: the value a load source gives (a generated
  * load, P-COUPLE-01), or, where it gives none, the scenario's series.
@@ -1370,23 +1490,35 @@ export interface WorkCursor {
     /** The work trace, once every step is taken, for the finished base trace the steps came from. */
     finish(base: RunTrace): WorkTrace;
 }
+/** A validated P-MULTIWORK-01 attachment and its digest, where a run uses one. */
+export interface MultiworkSource {
+    readonly attachment: MultiworkAttachment;
+    readonly sha256: string;
+}
 export declare function startWork(model: T.Model, scenario: T.Scenario, attachment: WorkAttachment, attachmentSha256: string, sources: {
     readonly describe: (id: string) => Refusal | undefined;
     readonly load?: LoadSource | undefined;
+    readonly multiwork?: MultiworkSource | undefined;
 }): WorkCursor;
 /**
  * The work trace for a base trace, from the model and scenario the base run
  * read and a validated attachment. Pure: it reads the base trace and writes
  * nothing to it.
  */
-export declare function workFromTrace(model: T.Model, scenario: T.Scenario, base: RunTrace, attachment: WorkAttachment, attachmentSha256: string): WorkTrace;
+export declare function workFromTrace(model: T.Model, scenario: T.Scenario, base: RunTrace, attachment: WorkAttachment, attachmentSha256: string, multiwork?: MultiworkSource): WorkTrace;
 /**
  * Validate the attachment against the model and its digest, run the unchanged
  * base engine once, and compute the work from that trace alone. Throws only
  * where the run cannot be initialised (ModelInvalidError, ConfigurationError);
  * every work value it cannot compute is refused in the result.
  */
-export declare function runWork(modelDoc: unknown, scenarioDoc: unknown, attachmentDoc: unknown, options?: RunOptions): {
+/** Options of a work run: the base run's, and where it uses one, a P-MULTIWORK-01 attachment (a document, validated here). */
+export interface WorkRunOptions extends RunOptions {
+    readonly multiwork?: unknown;
+}
+/** Validate a run's P-MULTIWORK-01 attachment, where it has one, against the model and work attachment and their digests. */
+export declare function resolveMultiwork(options: WorkRunOptions, model: T.Model, modelSha256: string, work: WorkAttachment, workSha256: string): MultiworkSource | undefined;
+export declare function runWork(modelDoc: unknown, scenarioDoc: unknown, attachmentDoc: unknown, options?: WorkRunOptions): {
     base: RunTrace;
     work: WorkTrace;
 };
@@ -1613,8 +1745,9 @@ export declare function backlogTraceHash(trace: BacklogTrace): string;
 ```ts
 import type { Rational } from '../../core/rational.ts';
 import type { Refusal, V } from '../../core/refusal.ts';
-import type { RunOptions } from '../../core/run.ts';
 import type { RunTrace } from '../../core/trace.ts';
+import type { WorkRunOptions } from '../work/run-work.ts';
+import type { MultiworkTrace } from '../multiwork/trace.ts';
 import type { WorkStepRecord, WorkTrace } from '../work/trace.ts';
 import type { BacklogAttachment } from './attachment.ts';
 import type { BacklogStepRecord, BacklogTrace } from './trace.ts';
@@ -1647,10 +1780,11 @@ export declare function backlogFromTraces(base: RunTrace, work: WorkTrace, attac
  * Throws only where a run cannot be initialised (ModelInvalidError,
  * ConfigurationError); every ledger value it cannot compute is refused.
  */
-export declare function runBacklog(modelDoc: unknown, scenarioDoc: unknown, workAttachmentDoc: unknown, backlogAttachmentDoc: unknown, options?: RunOptions): {
+export declare function runBacklog(modelDoc: unknown, scenarioDoc: unknown, workAttachmentDoc: unknown, backlogAttachmentDoc: unknown, options?: WorkRunOptions): {
     base: RunTrace;
     work: WorkTrace;
     backlog: BacklogTrace;
+    multiwork?: MultiworkTrace;
 };
 ```
 
@@ -1888,9 +2022,10 @@ export declare function couplingTraceHash(trace: CouplingTrace): string;
 ### src/proposals/couple/run-coupled.ts
 
 ```ts
-import type { RunOptions } from '../../core/run.ts';
 import type { RunTrace } from '../../core/trace.ts';
 import type { BacklogTrace } from '../backlog/trace.ts';
+import type { WorkRunOptions } from '../work/run-work.ts';
+import type { MultiworkTrace } from '../multiwork/trace.ts';
 import type { WorkTrace } from '../work/trace.ts';
 import type { CouplingTrace } from './trace.ts';
 type Doc = Record<string, unknown>;
@@ -1913,13 +2048,521 @@ export declare function couplingReplayScenario(scenarioDoc: unknown, coupling: C
  * cannot be configured (ConfigurationError); every value it cannot compute is
  * refused in the result.
  */
-export declare function runCoupled(modelDoc: unknown, scenarioDoc: unknown, workAttachmentDoc: unknown, backlogAttachmentDoc: unknown, couplingAttachmentDoc: unknown, options?: RunOptions): {
+export declare function runCoupled(modelDoc: unknown, scenarioDoc: unknown, workAttachmentDoc: unknown, backlogAttachmentDoc: unknown, couplingAttachmentDoc: unknown, options?: WorkRunOptions): {
     base: RunTrace;
     work: WorkTrace;
     backlog: BacklogTrace;
     coupling: CouplingTrace;
+    multiwork?: MultiworkTrace;
 };
 export {};
+```
+
+### src/proposals/handoff/attachment.ts
+
+```ts
+import type { Issue } from '../../core/errors.ts';
+import type { Rational } from '../../core/rational.ts';
+import type * as T from '../../core/schema/types.ts';
+import type { BacklogAttachment, Evidence } from '../backlog/attachment.ts';
+import type { CouplingAttachment } from '../couple/attachment.ts';
+import type { WorkAttachment } from '../work/attachment.ts';
+export declare const HANDOFF_ATTACHMENT_VERSION = "0.1.0";
+/** The proposal a handover attachment enables, at the contract version this engine computes. */
+export declare const HANDOFF_PROPOSAL: {
+    readonly id: "P-HANDOFF-01";
+    readonly version: "0.1";
+};
+/** When a handed-over obligation becomes eligible downstream: in the step the upstream completes it, or in the next. */
+export type Availability = 'same-step' | 'next-step';
+export interface HandoverClaim {
+    readonly statement: string;
+    readonly evidence: Evidence;
+}
+export interface Handover extends T.Annotated {
+    readonly handover: T.Id;
+    /** The upstream account, whose completions are handed over. */
+    readonly from: T.Id;
+    /** The downstream account, on another part, which admits them. */
+    readonly to: T.Id;
+    /** k downstream obligations per upstream completion, k above 0, in exactly the two accounts' obligation units. */
+    readonly correspondence: HandoverClaim & {
+        readonly perCompletion: Rational;
+        readonly fromUnit: string;
+        readonly toUnit: string;
+    };
+    /** Same-step or next-step: required, with no default. */
+    readonly timing: HandoverClaim & {
+        readonly availability: Availability;
+    };
+    /** That a handed-over obligation is eligible downstream from the step it arrives in, and carries until it is completed. */
+    readonly eligibility: HandoverClaim;
+    /** Next-step only: what the upstream completed before step 0 that arrives at step 0. */
+    readonly openingInTransit?: {
+        readonly value: T.OrGap<Rational>;
+        readonly evidence: Evidence;
+    } | undefined;
+}
+export interface HandoffAttachment extends T.Annotated {
+    readonly attachmentVersion: string;
+    readonly id: T.Id;
+    readonly model: T.Id;
+    readonly modelSha256: string;
+    /** The backlog attachment whose accounts hand over and admit, by id, version and exact digest. */
+    readonly backlogAttachment: {
+        readonly id: T.Id;
+        readonly version: string;
+        readonly sha256: string;
+    };
+    /** The coupling attachment of a coupled run, by id, version and exact digest; null for a run that only tracks. */
+    readonly couplingAttachment: {
+        readonly id: T.Id;
+        readonly version: string;
+        readonly sha256: string;
+    } | null;
+    /** The opt-in: P-HANDOFF-01 at its version. */
+    readonly proposals: readonly {
+        readonly id: string;
+        readonly version: string;
+    }[];
+    readonly handovers: readonly Handover[];
+}
+/** What the forward-only analysis finds for one handover. */
+export interface HandoverAnalysis {
+    readonly handover: T.Id;
+    /**
+     * What the downstream account's admissions can reach in a run, conservatively, sorted:
+     * 'account:', 'part:', 'resource:' or 'level:' and an id, or 'everything' where they reach the governor's modes or bands.
+     */
+    readonly reaches: readonly string[];
+    /** Whether no cycle of dependence returns to its upstream account: its own downstream, or a later handover's, cannot reach it. */
+    readonly forwardOnly: boolean;
+    readonly detail: string;
+    /** The pass from which its admissions are final (1 where nothing handed over reaches its upstream account); null where it is refused. */
+    readonly pass: number | null;
+}
+/** Read an untrusted JSON document into a handover attachment, collecting every issue with its path. */
+export declare function parseHandoffAttachment(doc: unknown): {
+    attachment?: HandoffAttachment;
+    issues: Issue[];
+};
+/**
+ * What the admissions of `account` can reach in a run, conservatively: a
+ * closure over accounts, parts, resources and levels, or 'everything' where a
+ * level the governor's bands or mode switches read is reached.
+ */
+export declare function reachOf(model: T.Model, work: WorkAttachment, backlog: BacklogAttachment, coupling: CouplingAttachment | null, handovers: readonly Handover[], account: T.Id): readonly string[];
+/**
+ * The forward-only analysis of every handover: what each one's downstream
+ * admissions reach, which handovers lie on a cycle of dependence (refused when
+ * computed), and, for the others, the pass from which their admissions are
+ * final. A handover depends on another where the other's downstream
+ * admissions reach its upstream account (a chain of handovers is such a
+ * dependence). The passes are fixed by this order before anything is
+ * computed: none is repeated to converge.
+ */
+export declare function handoffAnalysis(model: T.Model, work: WorkAttachment, backlog: BacklogAttachment, coupling: CouplingAttachment | null, handovers: readonly Handover[]): readonly HandoverAnalysis[];
+/** The claims of a handover, in a fixed order, with their evidence. */
+export declare function handoverClaims(h: Handover): readonly (readonly [string, Evidence])[];
+/** Checks of a parsed handover attachment against its model, backlog attachment, work attachment and, where named, coupling attachment, with their exact digests. */
+export declare function checkHandoffAttachment(a: HandoffAttachment, model: T.Model, modelSha256: string, backlog: BacklogAttachment, backlogSha256: string, work: WorkAttachment, coupling: {
+    attachment: CouplingAttachment;
+    sha256: string;
+} | null): Issue[];
+export interface HandoffValidation {
+    readonly ok: boolean;
+    readonly issues: readonly Issue[];
+    readonly attachment?: HandoffAttachment | undefined;
+}
+/** Parse and check a handover attachment against its model, backlog and work attachments and, where named, the coupling attachment, each with its exact digest. */
+export declare function validateHandoffAttachment(doc: unknown, model: T.Model, modelSha256: string, backlog: BacklogAttachment, backlogSha256: string, work: WorkAttachment, coupling: {
+    attachment: CouplingAttachment;
+    sha256: string;
+} | null): HandoffValidation;
+/** The claims an account's handover admissions rest on, where assumed or estimated: each handover's own, then its upstream account's and binding's (and theirs in turn). */
+export declare function handoverConditions(h: Handover, backlog: BacklogAttachment, coupling: CouplingAttachment | null, handovers: readonly Handover[], depth?: number): string[];
+```
+
+### src/proposals/handoff/trace.ts
+
+```ts
+import type { Id } from '../../core/schema/types.ts';
+import type { RefusalSummary, TV } from '../../core/trace.ts';
+import type { EvidenceStatus } from '../backlog/attachment.ts';
+import type { Availability, HandoverAnalysis } from './attachment.ts';
+export declare const HANDOFF_VERSION = "0.1.0";
+export interface HandoverStamp {
+    readonly handover: Id;
+    readonly from: Id;
+    readonly fromPart: Id;
+    readonly to: Id;
+    readonly toPart: Id;
+    /** k downstream obligations per upstream completion, exact. */
+    readonly perCompletion: string;
+    readonly fromUnit: string;
+    readonly toUnit: string;
+    readonly availability: Availability;
+    /** The handover's claims, as mapped, with their evidence labels and sources. */
+    readonly claims: readonly {
+        readonly claim: string;
+        readonly statement: string;
+        readonly status: EvidenceStatus;
+        readonly source: string;
+    }[];
+    /** Whether the downstream account generates a load (P-COUPLE-01), so that its admissions reach the run. */
+    readonly downstreamCoupled: boolean;
+    /** The assumed or estimated claims what the downstream admits from this handover rests on: the handover's, then its upstream's. */
+    readonly conditionalOn: readonly string[];
+    /** The forward-only analysis, made before anything was computed. */
+    readonly analysis: HandoverAnalysis;
+}
+export interface HandoffRunStamp {
+    readonly handoffVersion: string;
+    readonly proposal: {
+        readonly id: string;
+        readonly version: string;
+    };
+    /** True where any handover's admissions are conditional on an assumed or estimated claim. */
+    readonly conditional: boolean;
+    /** The passes run: one, plus the longest chain of dependence between handovers, fixed before any was run. */
+    readonly passes: number;
+    readonly runner: 'runCoupled' | 'runBacklog';
+    readonly base: {
+        readonly traceSha256: string;
+        readonly mapping: {
+            readonly id: Id;
+            readonly sha256: string;
+        };
+        readonly scenario: {
+            readonly id: Id;
+            readonly sha256: string;
+        };
+        readonly steps: number;
+        readonly proposals: readonly string[];
+    };
+    readonly work: {
+        readonly traceSha256: string;
+        readonly attachment: {
+            readonly id: Id;
+            readonly version: string;
+            readonly sha256: string;
+        };
+    };
+    /** The delivered backlog trace, and the attachment it read: derived from the mapped one, whose digest is given beside it. */
+    readonly backlog: {
+        readonly traceSha256: string;
+        readonly attachment: {
+            readonly id: Id;
+            readonly version: string;
+            readonly sha256: string;
+            readonly derived: true;
+        };
+        readonly mapped: {
+            readonly id: Id;
+            readonly version: string;
+            readonly sha256: string;
+        };
+    };
+    /** In a coupled run, the delivered coupling trace, and the coupling attachment it read: derived, naming the derived backlog attachment. */
+    readonly coupling: {
+        readonly traceSha256: string;
+        readonly attachment: {
+            readonly id: Id;
+            readonly version: string;
+            readonly sha256: string;
+            readonly derived: true;
+        };
+        readonly mapped: {
+            readonly id: Id;
+            readonly version: string;
+            readonly sha256: string;
+        };
+    } | null;
+    readonly attachment: {
+        readonly id: Id;
+        readonly version: string;
+        readonly sha256: string;
+    };
+    readonly handovers: readonly HandoverStamp[];
+}
+export interface HandoverRecord {
+    readonly handover: Id;
+    readonly from: Id;
+    readonly to: Id;
+    /** The upstream account's completions in the step, as its ledger gives them. */
+    readonly completions: TV;
+    /** k x completions, in the downstream unit. */
+    readonly handedOver: TV;
+    /** What the downstream account admits from the handover in the step: this step's handover (same-step) or the last step's (next-step). */
+    readonly admitted: TV;
+    /** Handed over and not yet admitted, at the close of the step: 0 for same-step. */
+    readonly inTransit: TV;
+}
+export interface HandoffStepRecord {
+    readonly step: number;
+    readonly handovers: readonly HandoverRecord[];
+}
+export interface HandoffTrace {
+    readonly stamp: HandoffRunStamp;
+    readonly steps: readonly HandoffStepRecord[];
+    /** Every refusal behind a refused handover value, once each, with where it applies. */
+    readonly refusals: readonly RefusalSummary[];
+    /** Open question ids behind the refusals, sorted. */
+    readonly questions: readonly string[];
+}
+/** SHA-256 of the canonical handover trace. */
+export declare function handoffTraceHash(trace: HandoffTrace): string;
+```
+
+### src/proposals/handoff/run-handoff.ts
+
+```ts
+import type { WorkRunOptions } from '../work/run-work.ts';
+import type { MultiworkTrace } from '../multiwork/trace.ts';
+import type { RunTrace } from '../../core/trace.ts';
+import type { BacklogTrace } from '../backlog/trace.ts';
+import type { CouplingTrace } from '../couple/trace.ts';
+import type { WorkTrace } from '../work/trace.ts';
+import type { HandoffTrace } from './trace.ts';
+/**
+ * Validate the documents and the handover attachment, and run the handovers
+ * by composition: the delivered traces are those of the last pass, with the
+ * handover trace that explains them and the derived documents they read (the
+ * replay record). Throws where the run is not valid (ModelInvalidError), cannot
+ * be configured (ConfigurationError), or where a defect check fails
+ * (AccountingError); every value it cannot compute is refused in the result.
+ */
+export declare function runHandoff(modelDoc: unknown, scenarioDoc: unknown, workAttachmentDoc: unknown, backlogAttachmentDoc: unknown, couplingAttachmentDoc: unknown | null, handoffAttachmentDoc: unknown, options?: WorkRunOptions): {
+    base: RunTrace;
+    work: WorkTrace;
+    backlog: BacklogTrace;
+    coupling: CouplingTrace | null;
+    handoff: HandoffTrace;
+    derived: {
+        readonly backlog: unknown;
+        readonly coupling: unknown | null;
+    };
+    multiwork?: MultiworkTrace;
+};
+```
+
+### src/proposals/multiwork/attachment.ts
+
+```ts
+import type { Issue } from '../../core/errors.ts';
+import type { Rational } from '../../core/rational.ts';
+import type * as T from '../../core/schema/types.ts';
+import type { BacklogAttachment, Divisibility, Evidence } from '../backlog/attachment.ts';
+import type { WorkAttachment } from '../work/attachment.ts';
+export declare const MULTIWORK_ATTACHMENT_VERSION = "0.1.0";
+export declare const MULTIWORK_PROPOSAL: {
+    readonly id: "P-MULTIWORK-01";
+    readonly version: "0.1";
+};
+/** A work on an arranged part: whether its output comes in whole units, and any declared rule for whole units. */
+export interface ArrangedWork {
+    readonly work: T.Id;
+    /** 'indivisible' (whole units only), 'divisible' (a fractional output is supported), or a gap (not known). */
+    readonly divisibility: T.OrGap<Divisibility>;
+    /**
+     * For indivisible work only: the declared rule that the work completes the
+     * most whole units its allocation and its other limits allow, the hours left
+     * under one unit staying unused. Absent: no such rule, and a fractional output
+     * is refused, never rounded.
+     */
+    readonly wholeUnits?: {
+        readonly rule: 'most-whole-units-within-allocation';
+        readonly evidence: Evidence;
+    } | undefined;
+}
+/** Fixed shares, as amounts of the shared resource per step or as fractions of the balance. */
+export type Shares = {
+    readonly kind: 'amount';
+    readonly of: readonly {
+        readonly work: T.Id;
+        readonly value: Rational;
+    }[];
+    /** What happens in a step whose balance is below the shares' sum: refuse, or scale every share down in proportion. */
+    readonly whenBalanceBelow: 'refuse' | 'scale-down';
+} | {
+    readonly kind: 'fraction';
+    readonly of: readonly {
+        readonly work: T.Id;
+        readonly value: Rational;
+    }[];
+};
+/** What happens to an amount a work does not use, and to any amount no share names: it stays unused, or is passed on, once, in a stated order. */
+export type Unused = {
+    readonly kind: 'idle';
+} | {
+    readonly kind: 'passed-on';
+    readonly order: readonly T.Id[];
+};
+export type Arrangement = {
+    readonly form: 'fixed-shares';
+    readonly shares: Shares;
+    readonly unused: Unused;
+    readonly evidence: Evidence;
+} | {
+    readonly form: 'strict-priority';
+    readonly order: readonly T.Id[];
+    readonly evidence: Evidence;
+};
+/** An arrangement in force from a step until the next entry: dated, and independent of the base run's modes. */
+export interface ScheduleEntry {
+    readonly fromStep: number;
+    readonly arrangement: T.OrGap<Arrangement>;
+    readonly label?: string | undefined;
+}
+export interface PartArrangement {
+    readonly part: T.Id;
+    /** The one resource every listed work's recipe uses: the balance they share. */
+    readonly resource: T.Id;
+    readonly works: readonly ArrangedWork[];
+    readonly schedule: readonly ScheduleEntry[];
+    readonly rationale?: string | undefined;
+}
+export interface MultiworkAttachment extends T.Annotated {
+    readonly attachmentVersion: string;
+    readonly id: T.Id;
+    readonly model: T.Id;
+    readonly modelSha256: string;
+    readonly workAttachment: {
+        readonly id: T.Id;
+        readonly version: string;
+        readonly sha256: string;
+    };
+    readonly proposals: readonly {
+        readonly id: string;
+        readonly version: string;
+    }[];
+    readonly parts: readonly PartArrangement[];
+}
+/** Read an untrusted JSON document into a multiwork attachment, collecting every issue with its path. */
+export declare function parseMultiworkAttachment(doc: unknown): {
+    attachment?: MultiworkAttachment;
+    issues: Issue[];
+};
+/** Checks of a parsed attachment against its model, its work attachment and their exact digests. */
+export declare function checkMultiworkAttachment(a: MultiworkAttachment, model: T.Model, modelSha256: string, work: WorkAttachment, workSha256: string): Issue[];
+/** Where an account exists for an arranged work, the two state the same divisibility. */
+export declare function checkMultiworkAccounts(a: MultiworkAttachment, backlog: BacklogAttachment): Issue[];
+export interface MultiworkValidation {
+    readonly ok: boolean;
+    readonly issues: readonly Issue[];
+    readonly attachment?: MultiworkAttachment | undefined;
+}
+/** Parse and check a multiwork attachment against its model, its work attachment and their digests. */
+export declare function validateMultiworkAttachment(doc: unknown, model: T.Model, modelSha256: string, work: WorkAttachment, workSha256: string): MultiworkValidation;
+/** The arrangement in force at a step: the last schedule entry from that step or before. */
+export declare function scheduleAt(schedule: readonly ScheduleEntry[], step: number): ScheduleEntry;
+```
+
+### src/proposals/multiwork/trace.ts
+
+```ts
+import type { Id } from '../../core/schema/types.ts';
+import type { RefusalSummary, TV } from '../../core/trace.ts';
+import type { EvidenceStatus } from '../backlog/attachment.ts';
+export declare const MULTIWORK_VERSION = "0.1.0";
+export interface AllocationWorkRecord {
+    readonly work: Id;
+    readonly divisibility: 'indivisible' | 'divisible' | 'unknown';
+    /** Whether the declared rule of most whole units within the allocation applied. */
+    readonly wholeUnits: boolean;
+    /** What the arrangement made available to the work: its share (and what was passed on to it), or under a strict order what remained at its turn. */
+    readonly available: TV;
+    /** The shared resource its output accounts for: output x recipe / yield. */
+    readonly used: TV;
+    readonly output: TV;
+    /** Under any arrangement: the most it could produce with the whole balance. */
+    readonly atMost: TV;
+    /** Its reference output and capacity (and any other resource of its recipe), without the shared balance. */
+    readonly ceiling: TV;
+    /** The shared resource that ceiling would need. */
+    readonly forCeiling: TV;
+}
+export interface AllocationRecord {
+    readonly part: Id;
+    readonly resource: Id;
+    readonly arrangement: {
+        readonly form: 'fixed-shares' | 'strict-priority' | 'unknown';
+        readonly fromStep: number;
+        readonly status: EvidenceStatus | null;
+        readonly source: string | null;
+        /** The gap's note, or why the arrangement is not applied. */
+        readonly note: string | null;
+    };
+    /** What is left for work once upkeep is covered: the base trace's remainder for work, unchanged. */
+    readonly balance: TV;
+    readonly works: readonly AllocationWorkRecord[];
+    readonly used: TV;
+    /** balance less used: never reassigned except by the mapped rule, never carried to the next step. */
+    readonly unused: TV;
+    /** The shared resource the works' ceilings need, together; and how far the balance falls below it. Both hold under any arrangement. */
+    readonly demand: TV;
+    readonly shortfall: TV;
+}
+export interface OutstandingRecord {
+    readonly part: Id;
+    readonly resource: Id;
+    /** The accounts whose obligations are counted: those of the arranged works. */
+    readonly accounts: readonly Id[];
+    /** The shared resource needed for the obligations owed at the start of the step: exact at step 0, a lower bound after. */
+    readonly openingAtLeast: TV;
+    /** The shared resource needed for the step's admissions. */
+    readonly admitted: TV;
+    readonly balance: TV;
+    /** At least what is owed at the end of the step: the opening, plus the admissions, less the balance, and never below 0. */
+    readonly closingAtLeast: TV;
+    /** Where every account's closing balance is known: what is owed at the end of the step, never below the bound. */
+    readonly closing: TV | null;
+}
+export interface OutstandingCondition {
+    readonly part: Id;
+    readonly resource: Id;
+    readonly accounts: readonly Id[];
+    /** Whether the static conditions for the bound hold: every account's claims known, and every counted work's recipe and yield known and above 0. */
+    readonly holds: boolean;
+    readonly notes: readonly string[];
+}
+export interface MultiworkTrace {
+    readonly stamp: {
+        readonly multiworkVersion: string;
+        readonly proposal: {
+            readonly id: string;
+            readonly version: string;
+        };
+        readonly attachment: {
+            readonly id: Id;
+            readonly version: string;
+            readonly sha256: string;
+        };
+        readonly work: {
+            readonly traceSha256: string;
+        };
+        readonly backlog: {
+            readonly traceSha256: string;
+        };
+    };
+    readonly conditions: readonly OutstandingCondition[];
+    readonly steps: readonly {
+        readonly step: number;
+        readonly outstanding: readonly OutstandingRecord[];
+    }[];
+    readonly refusals: readonly RefusalSummary[];
+}
+```
+
+### src/proposals/multiwork/bound.ts
+
+```ts
+import type { BacklogTrace } from '../backlog/trace.ts';
+import type { WorkAttachment } from '../work/attachment.ts';
+import type { MultiworkSource } from '../work/run-work.ts';
+import type { WorkTrace } from '../work/trace.ts';
+import type { MultiworkTrace } from './trace.ts';
+export declare function outstandingBounds(work: WorkAttachment, multiwork: MultiworkSource, workTrace: WorkTrace, backlogTrace: BacklogTrace): MultiworkTrace;
 ```
 
 ### src/draft/index.ts
@@ -2014,7 +2657,8 @@ A model or scenario that breaks an **error** rule cannot be initialised: `run` t
 - [self-set-access] (flag) A part that sets its own access is a separate case: excluded from ranking and not computed (C3.5).
 - [dependency] A part cannot feed itself.
 - [rank-layer] A declared layer must equal the layer derived from dependencies (C4.3a).
-- [rank-unreached] (flag) A part with no dependency path to the top sits in the bottom layer (decision Q-017).
+- [rank-unreached] (flag) A part with no dependency path to a known top sits in the bottom layer (decision Q-017).
+- [rank-underived] (flag) The dependency layers cannot be derived, because the top is an information gap or sets its own access. No part is placed in a layer or called unreached, and nothing stands in for the top. With the top a gap, the order and the protected flow are refused, and a draw is stated only where PROP-TOP-01 establishes it.
 - [band] A band's lower limit is not above its upper limit; a held value lies inside the band (C2.2a, C2.2n1); at most one band per level.
 - [band-missing] A mode holds only levels the governor has a band on (C2.2a).
 - [level-producer] Every level names an existing part as its producer (C3.1a, C7.1a).
@@ -2121,6 +2765,56 @@ A coupling attachment that breaks an error rule stops `runCoupled` before anythi
 - [couple-impact] (flag) The preflight impact diagnostic: what reads the bound load (CF-D06).
 - [couple-sensed-level] (flag) A level measures the bound load, so the governor can sense the generated load in the same step, through the level's producing part and route (CF-D10).
 
+### Handover attachment (P-HANDOFF-01; against its model, its backlog attachment, that attachment's work attachment and, where named, the coupling attachment)
+- [handoff-version] The attachment states format 0.1.0.
+- [handoff-proposal] It enables P-HANDOFF-01 at version 0.1, and nothing else.
+- [handoff-model], [handoff-model-digest] It names the model's id and that model's exact digest.
+- [handoff-backlog-attachment] It names the backlog attachment by id, version and exact digest.
+- [handoff-coupling-attachment] It names the coupling attachment of a coupled run by id, version and exact digest, or `null` for a run that only tracks; a supplied coupling attachment it does not name, or a named one not supplied, is an error.
+- [handoff-digest] A digest is 64 lower-case hex digits.
+- [handoff-evidence] A claim's evidence is `documented`, `estimated`, `assumed` or `unknown`, with a source.
+- [handoff-no-handover] It has at least one handover.
+- [handoff-account] A handover names accounts the backlog attachment maps.
+- [handoff-same-account] A handover runs between two accounts, never from an account to itself.
+- [handoff-same-part] The two accounts are on different parts.
+- [handoff-units] `fromUnit` and `toUnit` are exactly the two accounts' obligation units: no conversion is implied.
+- [handoff-ratio] The correspondence k (`perCompletion`) is above 0.
+- [handoff-fraction] (flag) The downstream account is indivisible and k is not a whole number: a step whose handover is not whole is refused, never rounded.
+- [handoff-availability] Timing is `same-step` or `next-step`, declared: there is no default.
+- [handoff-opening] A next-step handover states what is in transit at the start (a value, never taken as 0, or an explicit gap); a same-step handover states none; the value is not negative and, for an indivisible account, whole.
+- [handoff-unknown-claim] An unknown correspondence, timing or eligibility claim: the handover is not valid.
+- [handoff-conditional] (flag) An assumed or estimated claim: what the downstream admits from the handover is conditional on it.
+- [handoff-unknown-opening] (flag) The evidence for what is in transit at the start is unknown: the step-0 admission is refused.
+- [handoff-split] One account hands over through one handover: dividing or duplicating its completions between accounts is not given.
+- [handoff-cycle] The handovers form no cycle of accounts: rework loops are not given.
+- [handoff-link-conflict] No P-DEP-01 link is mapped from the upstream part to the downstream part as well: its same-step cap would stop the downstream completing carried-over obligations.
+- [handoff-outside-admissions] (flag) The downstream account also admits a series of its own; the handover's admissions are added to it. A check against double counting.
+- [handoff-reach] (flag) The forward-only analysis: what the downstream account's admissions can reach in a run.
+- [handoff-not-forward-only] (flag) The upstream account is within that reach, directly or through a cycle of dependence with other handovers: the handover is accepted and refused when computed.
+
+### Multiwork attachment (P-MULTIWORK-01; against its model and its work attachment, and, in a run with a ledger, that run's accounts)
+- [multiwork-version] The attachment states format 0.1.0.
+- [multiwork-proposal] It enables P-MULTIWORK-01 at version 0.1, and nothing else.
+- [multiwork-model], [multiwork-model-digest] It names the model's id and that model's exact digest.
+- [multiwork-work-attachment] It names the work attachment by id, version and exact digest.
+- [multiwork-evidence] An arrangement's or a whole-unit rule's evidence is `documented`, `estimated`, `assumed` or `unknown`, with a source.
+- [multiwork-single-work] An arranged part has at least two works in the work attachment.
+- [multiwork-works] The arrangement names every work on the part once, and no other.
+- [multiwork-resource] Every work on the part uses the shared resource the arrangement names.
+- [multiwork-shared-resources] No other resource is shared by two works of the part: one shared resource per part in this release.
+- [multiwork-per-unit] (flag) A work on the part has a per-unit capacity: the part's units would be counted once for each work, so it is accepted and refused when computed.
+- [multiwork-link] (flag) A P-DEP-01 link names the part: its output is not one quantity, so the link is accepted and refused when computed.
+- [multiwork-divisibility] Each work's divisibility is `indivisible`, `divisible` or a gap. Where the run has an account for the work, the two agree.
+- [multiwork-unknown-divisibility] (flag) A work's divisibility is a gap: a fractional output is refused.
+- [multiwork-whole-units] The whole-unit rule (`most-whole-units-within-allocation`, with its evidence) is for indivisible work only; with unknown evidence it is flagged and not applied.
+- [multiwork-schedule] The schedule starts at step 0, and its steps strictly increase.
+- [multiwork-form] An arrangement is `fixed-shares` or `strict-priority`, or a gap.
+- [multiwork-shares] Fixed shares name every work once (0 where it has none); they are amounts (with `whenBalanceBelow`: `refuse` or `scale-down`, no default) or fractions of the balance summing to at most 1.
+- [multiwork-unused] What happens to unused amounts is stated: `idle`, or `passed-on` in an order of the part's works, each once. No default.
+- [multiwork-order] A strict order names every work once.
+- [multiwork-unknown-arrangement] (flag) An arrangement that is a gap, or whose evidence is unknown: each work's output is refused.
+- [multiwork-conditional] (flag) An assumed or estimated arrangement: the results resting on it are conditional.
+
 The scenario of a coupled run is checked by the coupling-only path, `validateCoupledScenario`, which is not on an entry point: a bound load has no series ([load-supplied]), and [load-missing] is not raised for it. The exported `validateScenario` is unchanged, so the ordinary run still needs every load.
 
 ## 3. The simulation-step sequence
@@ -2129,7 +2823,7 @@ The scenario of a coupled run is checked by the coupling-only path, `validateCou
 1. Parse and validate the model, then the scenario against it. Any error: throw `ModelInvalidError`.
 2. If the allocation policy given is a disabled proposal (P-IPF-01 to P-IPF-06), or is P-LOAD-01 (not an allocation policy): throw `ConfigurationError`. With no policy, the run goes ahead and every draw is refused. P-LOAD-01 is on for the run only if the scenario's `enable` list names it.
 3. Digest each document (SHA-256 of its canonical JSON) for the stamp.
-4. Derive rank layers from dependencies. Layer 0 is the top; layer k holds parts whose work feeds layer k-1. Parts with no path to the top go in the bottom layer, the deepest reached and at least 1. Separate cases are not ranked.
+4. Derive rank layers from dependencies. Layer 0 is the top; layer k holds parts whose work feeds layer k-1. Parts with no path to the top go in the bottom layer, the deepest reached and at least 1. Separate cases are not ranked. Where the top is an information gap or a separate case, no layer is derived: no part is placed in one or called unreached, and nothing stands in for the top.
 5. Initial state:
    - the arrangement is the initial mode (its held levels, its settings, and positions from the mode's order or else each part's rank);
    - the bands are the governor's;
@@ -2188,12 +2882,19 @@ The scenario of a coupled run is checked by the coupling-only path, `validateCou
 6. **Requirement and upkeep** for each part and resource, from their rules on the part's loads at t (upkeep may read units).
    - A damaged part's requirement is refused.
    - Check: requirement never falls unless a load it reads fell (otherwise `AccountingError`, a defect).
-   - If a built-in part other than the top changes its requirement, the recorded order is refused until the next snapshot (Q-006).
-7. **The recorded order:** each ranked part's layer and position (the mode's order, else the part's rank; PROP-RANK-01).
+   - If a built-in part other than the top changes its requirement, the recorded order is refused until the next snapshot (Q-006). With the top an information gap, the order is refused because of the top instead, and the flag notes that the part may be the top, whose place never moves.
+7. **The recorded order:** each ranked part's layer and position (the mode's order, else the part's rank; PROP-RANK-01). With the top an information gap, no layer can be derived, so the order is refused (`unknown-prerequisite $.boundary.top`).
 8. **The draw,** per resource in id order:
    - **Entering** = inflow at t + outside input at t + store releases.
    - **Refused if:** a separate case draws the resource; the arrangement is unknown; no allocation policy was given; any value the policy needs is refused; the policy itself refuses (for example a missing grading); or the policy's result breaks a limit.
    - **The limits:** received never above access or route capacity; fills never above room; nothing above what entered; and, where all committed draws (access capped by route) fit within what entered, every part receives its committed draw (decision Q-002).
+   - **With the top an information gap (PROP-TOP-01 0.1.0, decision Q3, 2026-10-22):** after everything above that comes before the policy, the policy is called once for each candidate top: each part claiming the resource, then a top elsewhere in the boundary (no claiming part marked). Only `isTop` varies between the calls.
+     - **Stated:** only where every candidate gives a valid result, and every receipt, every fill and the unused amount are the same.
+     - **Refused for the top otherwise:** where the results differ, or the policy refused under some candidates (with what it refused). Also where the policy does not declare `unknownTop: 'evaluate-admissible-tops'`, in which case it is never called.
+     - **Refused alike:** where the policy refused alike under every candidate, its refusals stand alone.
+     - **Rank:** a policy that reads rank is refused before any call, because the order needs the top.
+     - **The record:** each resource record carries `unknownTop` with the candidates, whether the valid results are identical, whether Q-002 fixed the receipts, and the result and reason.
+     - **Unchanged:** a known top takes the path above, with one call and no record.
    - **Otherwise** it gives each part's amount received and each store's fill, and what is left = entering minus received minus fills.
 9. **Part accounting,** for each part and resource:
    - realised flow = received;
@@ -2315,13 +3016,69 @@ C_t never changes step t. A refused G refuses what the mapped rules make depend 
 
 No trace names the coupling trace, so no fingerprint is circular. `couplingReplayScenario(scenario, couplingTrace)` gives the effective scenario: the generated loads stated as series, one entry per step, with a refused value as a gap, and an id ending `.replay`. The unchanged `runBacklog` on it gives the same known figures and refuses the same fields; the stamps, tags, hashes and some refusal ids differ by design.
 
+### The handover run (P-HANDOFF-01): completions handed to another account, by composition
+`runHandoff(model, scenario, workAttachment, backlogAttachment, couplingAttachment | null, handoffAttachment, options)` validates the documents in turn and the handover attachment last. It changes no runner: it runs the unchanged `runCoupled` (or `runBacklog`, where nothing is coupled) on derived documents. For handover h from account U to account V, in step t:
+1. **Handed over** H_t = k x C^U_t, where C^U_t is U's completions after P-LOAD-02's guards. A refused completion refuses H_t with its own ids. A fractional H_t into an indivisible V is refused (`handoff/unsupported-rule fractional handover into indivisible obligations <h>`).
+2. **Admitted** A_t = H_t (same-step) or H_{t-1} (next-step; A_0 is the opening in transit, refused if it is a gap or its evidence is unknown).
+3. **V's admissions** N^V_t = V's own series as mapped + A_t, written into a derived backlog attachment (a refused amount as a gap naming its refusal ids). V's admissions claim there says it is derived, from which completions, and takes the weakest evidence among V's own claim, the handover's claims and U's conditions. A coupling attachment, where there is one, is re-bound to the derived backlog attachment.
+4. **Everything else** is P-LOAD-02 and P-COUPLE-01, unchanged.
+
+**Forward-only.** Before anything runs, `handoffAnalysis` finds what each downstream account's admissions can reach. It covers:
+- its generated load and the levels measuring it;
+- the part's draws, and so every part drawing the same resources, with their stores and routes;
+- the levels on those resources, those the part produces or receives, and every setting, route or store rule reading them;
+- a governor band or mode switch on any of them, which reaches everything;
+- P-DEP-01 links;
+- further handovers.
+
+A handover depends on another where the other's downstream reaches its upstream account. A handover on a cycle of that dependence, including one whose own downstream reaches its upstream, is not forward-only. It is refused in every pass (`handoff/unsupported-rule not forward-only <h>`), and the upstream stays computed by the existing rules.
+
+**Passes.** Their number is fixed before any runs: 1 + the longest chain of dependence among forward-only handovers. Pass 0 gives each handover an explicit gap, never 0. Pass p gives each handover what its upstream completed in pass p - 1. Nothing is repeated to converge. The last pass is the result.
+
+**Two defect checks follow.** Each throws `AccountingError`, and then nothing is returned:
+- every upstream account and part has identical records in the last two passes;
+- each handover conserves: k x the sum of its completions + the opening in transit = the sum admitted + what is in transit at the close.
+
+The **handover trace** has:
+- **its stamp:**
+  - P-HANDOFF-01 0.1, `conditional`, the passes and the runner;
+  - the delivered base, work, backlog and coupling traces' hashes;
+  - the derived backlog and coupling attachments' digests, labelled `derived`, beside the mapped ones;
+  - the attachment's digest;
+  - per handover, its accounts, parts, k and units, its timing, its claims and evidence, whether the downstream is coupled, its conditions and its analysis;
+- **per step and handover:** the completions read, the amount handed over, the amount admitted (tagged `input` only for a next-step opening in transit), and what is in transit at the close;
+- **the refusals** behind any refused handover value.
+
+The derived documents are returned with the traces as the replay record. The unchanged runner on them reproduces the delivered traces byte for byte. The base stamp names the proposals of the runner it came from (P-COUPLE-01 in a coupled run), and the handover trace names P-HANDOFF-01.
+
+### Several works on one part (P-MULTIWORK-01): one productive balance, a mapped arrangement
+A work run given a multiwork attachment (`options.multiwork` of `runWork`, `runBacklog`, `runCoupled` or `runHandoff`, validated against the model and work attachment, and against the run's accounts) computes the works of each arranged part together, in place of P-WORK-01's refusal of several works on one part. Nothing else changes: without the attachment every trace is byte for byte as before. For arranged part p, its shared resource r and step t:
+1. **The balance** W = p's remainder for work on r in the base trace (what reaches the part once upkeep is covered), read once. PAM is unchanged: access, receipt, upkeep, requirement and shortfall.
+2. **The arrangement** in force is the schedule's last entry from a step at or before t. The schedule is the work layer's own: it never changes, and is never changed by, the base run's modes.
+3. **What each work is given:**
+   - fixed shares, amounts: each its amount, where they fit within W; where they do not, the step is refused (`work/unsupported-rule shares exceed balance <part>`) or every share scaled down in proportion, as the arrangement states;
+   - fixed shares, fractions: each its fraction x W;
+   - unused `passed-on`: what no work used (and any amount no share names) offered once to the works in the stated order;
+   - strict priority: each work in order what remains after those before it.
+4. **Each work's output** is P-WORK-01's own: the least of its reference output, its capacity and yield x the least recipe limit, with what it was given standing for the shared resource. Then:
+   - a divisible work keeps a fractional output;
+   - an indivisible work with the declared rule completes the most whole units within those limits;
+   - an indivisible work with no such rule, or one whose divisibility is a gap, has a fractional output refused (`work/unsupported-rule fractional output of indivisible work <w>`, `work/unknown-prerequisite divisibility <w>`). Nothing is rounded.
+5. **Used** = output x recipe / yield; **unused** = W less the sum used, never reassigned except by the arrangement and never carried to the next step. A work using more than it was given, or the works more than W, is a defect (`AccountingError`).
+6. **Unknown** (a gap, or evidence unknown): each work's output, its work not done and what depends on them are refused (`work/unknown-prerequisite arrangement <part> from step <s>`). A known 0 still settles: W = 0, or a work's own ceiling of 0.
+7. **Under any arrangement** each step also records each work's upper bound (its output from the whole of W), its ceiling and what it would need, and the works' demand and its shortfall against W.
+
+The work records of arranged works show what each was given as `available`; the balance is recorded once, in the step's `allocations`. A per-unit capacity, or a P-DEP-01 link on the part, is refused (`work/unsupported-rule per-unit capacity on an arranged part <w>`, `work/unsupported-rule link on an arranged part <p>`).
+
+**The outstanding-work trace** (runners with a ledger return it as `multiwork`): for each arranged part, a lower bound on the shared resource needed for the obligations owed to its works. It is exact at step 0, and after each step at least the opening, plus the admissions, less W, never below 0, each account converted at its work's recipe / yield. It holds only where every counted account's claims are known, each counted work's yield is known and above 0, and the step's admissions and balance are known. Once refused it stays refused. Where every closing balance is known, what is owed is reported beside the bound, and a value below it is a defect (`AccountingError`).
+
 ## 4. Refusal categories
 
 | Category | Meaning | Produced by |
 |---|---|---|
-| unknown-prerequisite | A value the calculation needs is unknown | An explicit gap in the model, scenario or work attachment; a missing initial reading; a reading outside a linear table's range; no alarm response stated; silence read as no intervention with no earlier value (Q-029); no sending dial where one is needed (Q-004); missing P-ALLOC-01 grading; upkeep above requirement in a step (Q-023); an undrawn pair a level measures; in the backlog ledger, a gap or an unknown claim in its inputs (ids start `backlog/`) |
+| unknown-prerequisite | A value the calculation needs is unknown | An explicit gap in the model, scenario or work attachment; a missing initial reading; a reading outside a linear table's range; no alarm response stated; silence read as no intervention with no earlier value (Q-029); no sending dial where one is needed (Q-004); missing P-ALLOC-01 grading; upkeep above requirement in a step (Q-023); an undrawn pair a level measures; in the backlog ledger, a gap or an unknown claim in its inputs (ids start `backlog/`); in a handover run, an unknown opening in transit (ids start `handoff/`) |
 | invalid-resource-topology | The mapped routes cannot be computed on the one shared flow | No path produces it now: since decision Q-010, validation rejects such routes before a run |
-| unsupported-rule | The calculation needs a rule CANON does not give, or a proposal not in force would supply | A built-in rule reading a silent level (Q-012); a built-in part's place after its requirement changes (Q-006); a separate case (Q-014); damage (Q-015); units after a shortfall where P-LOAD-01 is not enabled or the part has no dials (Q-016); in the work extension, several works on one part, a same-step cycle among links, a lagged link, finite shared support, a reference output below 0, and a separate case's work (ids start `work/`); in the backlog ledger, a reference output above the eligible obligations, a positive output with none, and a fractional closure of indivisible obligations (ids start `backlog/`) |
+| unsupported-rule | The calculation needs a rule CANON does not give, or a proposal not in force would supply | A built-in rule reading a silent level (Q-012); a built-in part's place after its requirement changes (Q-006); a separate case (Q-014); damage (Q-015); units after a shortfall where P-LOAD-01 is not enabled or the part has no dials (Q-016); in the work extension, several works on one part, a same-step cycle among links, a lagged link, finite shared support, a reference output below 0, and a separate case's work (ids start `work/`); in the backlog ledger, a reference output above the eligible obligations, a positive output with none, and a fractional closure of indivisible obligations (ids start `backlog/`); in a handover run, a handover that is not forward-only and a fractional handover into indivisible obligations (ids start `handoff/`) |
 | unspecified-allocation-policy | No allocation policy, or one that broke a limit | No policy given (Q-001); a policy result above access or route capacity, above a store's room, above what entered, or below committed draws when enough entered (Q-002) |
 | scarcity-precondition-not-met | A result stated only under CANON 1's conditions was asked for where they do not hold | CANON 1's ledger where inflow is not fully used, or a part received above its requirement |
 | invalid-settings-change | A change to the arrangement that cannot be applied | An intervention replacing settings or held levels while the arrangement is unknown |
@@ -2339,6 +3096,7 @@ None of these is CANON; each can be withdrawn by James. The stamp lists every pr
 | PROP-RANK-01 | Every run | Position within a layer is as documented at mapping (a mode's order, else the part's rank); parts with no path to the top go in the bottom layer (decision Q-017) |
 | PROP-ROUTE-01 | Every run | A route's capacity is a declarative rule on sensed levels (governor-set or built-in); routes run from the shared flow only (decision Q-010); a part with no route has no network cap; one route per part per resource |
 | PROP-STORE-01 | Models with a store | A store's release and fill limits are declarative rules on sensed levels; release is bounded by content, and fill by the limit and the room after release |
+| PROP-TOP-01 | Every run whose top is an information gap and whose allocation policy declares `unknownTop: 'evaluate-admissible-tops'` (P-ALLOC-01 does); never with a known top | Allocation under an unknown top (0.1.0, decision Q3, 2026-10-22; an engine proposal, not a CANON rule). A resource's draw is stated only where the policy gives the same valid result under every candidate top: each claiming part, and a top elsewhere in the boundary, which is one candidate, never a default. Otherwise it is refused for the top. The order and the protected flow stay refused, so a stated draw is never a protected-top allocation. Each resource record carries `unknownTop` (section 3, step 8) |
 | PROP-SILENCE-01 | Models where a rule reads a level | A rule states its response to silence read as alarm (`whenSilent.alarm`); silence read as no intervention needs no value, because the earlier value stands |
 | P-LOAD-01 | Only where the scenario enables it (`"enable": ["P-LOAD-01"]`) | Unit loss and rebuilding, form approved by James 2026-10-20 (step 10 of section 3). Loss from uncovered upkeep, the largest across resources. Rebuilding paid from what is left after parts draw and stores fill, shared in proportion. Units become exact fractions. Parts need both dials; backlog and damage dials stay undefined |
 | PROP-SENSE-01 | Models that set a sending dial on any level | The sending dial (decision Q-004): `keeps-sending`, or `stops-when-short` with an amount per required resource, stopping (never sent) when any shortfall in the step before exceeds its amount; with no dial, the level is refused where the dial is needed |
@@ -2346,6 +3104,8 @@ None of these is CANON; each can be withdrawn by James. The stamp lists every pr
 | P-DEP-01 | Only in `runWork`, for an attachment that enables it and maps links | A functional cap on an existing dependency: the downstream actual output is at most the upstream actual output / ratio, same step, non-exclusive enablement only; nothing is deducted upstream and nothing becomes a resource route. Ordinary dependencies stay rank-only |
 | P-LOAD-02 | Only in `runBacklog` or `backlogFromTraces`, for a backlog attachment that enables it; never in `run()` or `runWork()`, never through a scenario | Carryable obligations, tracking only (section 3, the backlog ledger): per account and step, opening balance, admissions, eligible obligations, completions read one to one from the work's actual output behind its guards, withdrawals of 0, closing balance. No feedback into any run. Approved by James 2026-10-20 as an optional proposal, not CANON |
 | P-COUPLE-01 | Only in `runCoupled`, for a coupling attachment that enables it; never in `run()`, `runWork()` or `runBacklog()`, never through a scenario | Coupled backlog feedback (section 3, the coupled run): an account's eligible obligations G_t = B_t + N_t are given, step by step, to one load declared on the account's own part, in its exact unit, under an active-workload claim that holds for the whole run; the existing rules do the rest. The v0.3 design resolutions were approved by James, and the implementation authorised on 2026-10-20. An optional proposal, not CANON |
+| P-MULTIWORK-01 | Only in a work run given a multiwork attachment through its options (`runWork`, `runBacklog`, `runCoupled`, `runHandoff`); never in `run()`, never through a scenario, never by the base run's modes | Several works on one part (section 3). They draw on one finite productive balance, the remainder for work once upkeep is covered, under an explicitly mapped, dated arrangement: fixed shares (amounts or fractions, unused amounts idle or passed on in a stated order) or a strict order. There is no default, and an unknown arrangement refuses each work's outcomes while a lower bound on what is owed is kept where its inputs are established. Whole units only by a declared rule. Approved by James on 2026-10-21. An optional work-layer proposal, not CANON |
+| P-HANDOFF-01 | Only in `runHandoff`, for a handover attachment that enables it; never in `run()`, `runWork()`, `runBacklog()` or `runCoupled()`, never through a scenario | Carryable cross-stage handovers (section 3, the handover run). One account's completions become admissions of an account on another part, k per completion, same-step or next-step as declared, with explicit units, eligibility and evidence. The downstream account keeps P-LOAD-02's ledger, so it can complete obligations admitted in earlier steps. It is computed by composition of the unchanged runners, only for forward-only handovers, in a number of passes fixed in advance. It moves counts of obligations, never resources. Approved in principle by James, and its first release authorised, on 2026-10-21. An optional work-accounting proposal, not CANON |
 | APP-04 | Scenario validation | A scenario cannot declare components (APPLICATION 5) |
 | APP-08 | Every run (flag only) | Flags a step where the top is short of the protected resource while another part is not, noting any support part short in the step before (APPLICATION, Applying CANON 4) |
 

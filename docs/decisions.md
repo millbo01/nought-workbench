@@ -199,3 +199,157 @@ Source: James's instruction of 2026-10-20 to implement P-COUPLE-01 within the ap
   - the ids of refusals that come through G (the replay reads a stated gap);
   - for those values, the ledger's diagnostics, which classify the ids.
 - **Fixtures.** `two-step-coupled` reproduces CF-R03. In `organisation-caseload-unit-loss` the admissions are chosen so that every completion is a whole number of cases. The service work's resource-limited output is 32.4 cases, and the ledger refuses a fractional closure of indivisible cases rather than rounding it; with other numbers that refusal is followed, as tested.
+
+## 2026-10-21: P-HANDOFF-01 (carryable cross-stage handovers), approved in principle; first release authorised
+
+Source: James's review of [p-handoff-01-scope.md](p-handoff-01-scope.md) on 2026-10-21. P-HANDOFF-01 is approved in principle, and the narrowly scoped first release is authorised. Ordinary engineering decisions are the engine's. Escalation is only for a genuine theoretical contradiction or an expensive-to-reverse architecture issue; none arose.
+
+### Approved by James
+
+1. **Semantics and the forward-only rule.** P-HANDOFF-01 is a new, optional, versioned work-handover attachment and coordinator. It preserves PAM, P-WORK-01, P-LOAD-02, P-COUPLE-01 and P-DEP-01. A handover converts declared upstream completions into downstream admissions, with an explicit correspondence, units, eligibility and timing. Downstream accounts can complete outstanding work admitted earlier, not only the current step's admissions. For same-step execution the whole computational dependency must be forward-only, including indirect influence through shared resource allocations, governors and other model relationships. There is no fixed-point iteration. Where independence cannot be established, the handover is refused. The two-pass composition also verifies upstream invariance across the modelled run.
+2. **Westbridge timing: same-step.** Same-step eligibility is used in the synthetic Westbridge example, with its supporting evidence or explicit modelling assumption recorded. Timing is never described as documented just because it reproduces the baseline numbers. Next-step stays supported as a distinct, explicit declaration, with the opening in-transit obligations.
+3. **Composition for v1.** It is built on the unchanged runners. A coordinator-level provenance and handover trace identify downstream admissions as generated from upstream completions, not independent external inputs. That distinction stays clear in the user-facing explanation, the scenario export and the replay record. A same-week dependency cap is not applied to the same handover in a way that prevents carried-over eligible work being completed. Refusals keep following what depends on them, and conservation, exact unit checks and golden results are preserved. There are no assumed zeros and no silent rounding.
+4. **The overall waiting total: approved conditionally.** In the Westbridge one-to-one example, the total waiting across the unbooked and booked-but-unvisited stages is shown. Accounts are added only where they are mutually exclusive stages of the same obligations, the correspondence is declared, and in-transit work is counted with no omission or duplication. It is never a generic addition of unrelated backlog quantities.
+
+### Implementation choices (the engine's, within the approval)
+
+- **Versions.** Engine and schema stay 0.4.0. P-HANDOFF-01 is at contract version 0.1, the handover attachment format 0.1.0 (`HANDOFF_ATTACHMENT_VERSION`) and the handover trace 0.1.0 (`HANDOFF_VERSION`). `runHandoff` is a new export on `nought-engine/proposals`; no existing export changed. The package moves from 0.2.0 to 0.3.0. It is not published to any registry.
+- **No runner changed.** `runHandoff` validates, then runs the unchanged `runCoupled` (or `runBacklog`, where nothing is coupled) on derived documents. The derived backlog attachment is the mapped one, with each downstream account's admissions series replaced by its own series plus what is handed over, one explicit entry per step. A refused amount is written as an information gap naming its refusal ids. The derived coupling attachment is the mapped one, re-bound to the derived backlog attachment's digest.
+- **Passes, not iteration.** The number of passes is fixed before any runs: 1 + the longest chain of dependence among forward-only handovers (a chain of handovers, or one handover's downstream reaching another's upstream). Pass 0 gives each handover an explicit gap, never 0. Pass p gives each one what its upstream completed in pass p - 1. No pass is repeated to converge.
+- **The forward-only analysis** (`handoffAnalysis`) is conservative and static. It follows what a downstream account's admissions can reach:
+  - its generated load, and the levels measuring that load;
+  - the part's resources: what it requires, keeps up, is set or routed, and its P-LOAD-01 dials;
+  - every part drawing those resources;
+  - the levels on those resources, those the part produces, and those measuring what it receives;
+  - every setting, route or store rule that reads those levels;
+  - any governor band or mode switch on them, which reaches everything;
+  - P-DEP-01 links;
+  - further handovers.
+
+  A handover on a cycle of dependence, including one whose own downstream reaches its upstream, is refused when computed (`handoff/unsupported-rule not forward-only <h>`), in every pass, so it never varies.
+- **The safeguard.** After the last pass, every forward-only handover's upstream account, its part's base records (draws and units) and its work records must be identical in the last two passes, and each handover must conserve. Either failure throws `AccountingError` and returns nothing. It would mean the analysis missed an influence.
+- **A P-DEP-01 link beside a handover is rejected** (`handoff-link-conflict`), where the scope had proposed only a flag. Decision 3 asks that the same-week cap never stop carried-over work being completed.
+- **Evidence.** The derived admissions claim takes the weakest status among:
+  - the downstream account's own admissions claim;
+  - the handover's correspondence, timing and eligibility claims;
+  - the upstream account's assumed or estimated claims and binding (and those of earlier handovers).
+
+  So P-LOAD-02 marks the downstream results conditional where any of these is. The handover stamp lists the exact conditions. An unknown opening in transit refuses only the step-0 admission.
+- **Provenance in the traces.** The downstream admissions claim's source in the derived attachment, and so in the backlog stamp, begins "P-HANDOFF-01, derived: generated from the completions of ...". The handover stamp gives the derived digests (`derived: true`) beside the mapped ones. The handover records tag admissions `computed`, except a next-step opening in transit (`input`). Two limits are known:
+  - the backlog records still tag the downstream admissions `input`, as P-LOAD-02 tags any series;
+  - the base stamp names the runner's own proposals (P-COUPLE-01), not P-HANDOFF-01.
+
+  The handover trace is the authority on both, and is always delivered with the traces it explains.
+- **The Westbridge pathway.** The P-DEP-01 link is removed, and one handover carries bookings to a new account, "booked, waiting for a first visit". It opens at 12, documented by an added count sentence in the synthetic note, and has no outside admissions. The same-step timing and the carrying-over are recorded as explicit modelling assumptions (`assumed`), with the note's sentences cited as support, not as proof. The correspondence (one visit per booking) and the stages of the same referrals are documented.
+- **The total** is computed by the mapping prototype, not the engine. It is shown only where the handover is one to one, the pathway documents that the two lists are stages of the same referrals, and the handover is computed. It adds what is in transit for a next-step handover. Otherwise the total is not shown, and the page and the report say why.
+
+## 2026-10-21: one part’s staff-hours across several kinds of work; the Q-017 crash
+
+Source: James’s review of `shared-staff-hours-assessment.md` on 2026-10-21, with his correction to its framing. None of this changes CANON or APPLICATION.
+
+### Decided by James
+
+1. **Productive work, not routine repair.**
+   - **Kestrel’s services:** installing equipment and repairing equipment are both productive services Estates & IT Services delivers.
+   - **Not PAM’s routine repair:** customer-facing repairs are not the renewal of a part’s own worn units (C3.13b) merely because both are called repair.
+   - **Classified by function:** upkeep, preventive servicing and break-fix work are each classified by what they do.
+2. **One part, several kinds of work.**
+   - **The preferred representation:** for a genuinely shared pool, one operational part with several work activities drawing on its finite capacity. Each kind of work may have its own demand, completion rate and waiting list.
+   - **The arrangement decides:** the allocation arrangement determines which activities receive capacity and which are deferred. A fixed split of hours is one possible arrangement, not the universal model.
+   - **No artificial split:** a part is not split into artificial parts to suit P-WORK-01’s one-work-type restriction.
+   - **No forced mapping:** organisational departments are not assumed to map one-to-one to parts. Evidence and functional boundaries decide.
+3. **The existing P-ALLOC-01 finding is kept.** A documented standing division of hours can sometimes be represented with the current engine.
+   - **Not the general solution:** the shared-team binding is not implemented as the general solution. It is a restricted mapping option, and does not represent flexible internal scheduling between several kinds of work.
+   - **Unknown stays unknown:** no placeholder grading, inferred PAM top or invented scheduling rule may enter a combined calculation.
+   - **Separate What-ifs continue,** each with a clear shared-resource warning.
+4. **A future mechanism, recorded and not built.** The potential need for an optional, sector-neutral extension, in which one part takes on several kinds of work against one finite productive-capacity balance under an explicitly mapped work-allocation arrangement, is recorded as WQ-08. Foundational PAM is not altered to achieve it. The smallest valid extension will be examined separately.
+5. **The crash: authorised to fix,** narrowly and test-first, without inventing connectivity, resource access, zero values or an allocation rule, and preserving every golden output.
+
+### Carried out (the engine’s)
+
+- **The crash** (c65a796).
+  - **Valid under the existing contracts:** a part with no dependency path to the top that does not draw every resource. Q-017 puts such a part in the bottom layer, and a part draws only the resources it states a requirement on.
+  - **The cause:** the Q-017 flag loop read the part’s committed draw for every resource in the model before checking that the part draws it, and threw a TypeError.
+  - **The fix:** the loop now visits only the resources the part draws, as it already did for the parts ranked above it. For the others nothing is assumed: no access, no zero and no flag.
+  - **The test:** the Q-017 test gains the two-resource case. The flags on the resource the part draws are unchanged, and no golden output changed.
+- **The assessment:** reframed (Part I), with the first assessment kept as the restricted standing-allocation case (Part II).
+
+## 2026-10-21: P-MULTIWORK-01 (several works on one part), approved; first release implemented
+
+Source: James's acceptance of `wq-08-scope.md` on 2026-10-21, with three refinements. Routine implementation decisions were delegated, and no contradiction with an existing contract arose. The completion report is `p-multiwork-01-report.md`.
+
+### Approved by James
+
+- **The design.**
+  - One PAM part may do several distinct productive works.
+  - All of them draw on one finite productive balance, after upkeep, without double counting.
+  - Each has its own requirements, completions and waiting list.
+  - The arrangement is explicitly mapped, with provenance.
+  - The first-release arrangements are fixed shares (absolute amounts or fractions of the balance, with what happens when the balance changes made explicit) and strict priority, with no default.
+  - Unused capacity stays unused unless an evidenced or explicitly assumed arrangement passes it on.
+  - An unknown arrangement refuses work-level results rather than inventing a priority.
+  - With the extension disabled, PAM and the work mechanisms are exactly as before.
+- **Refinement 1: whole items.** Indivisible work, supported fractional work and unknown divisibility are kept distinct. Completing the most whole items within an allocation may be a declared rule, never silent rounding of a fractional result. Unused hours are recorded, and no partial work is carried.
+- **Refinement 2: the aggregate shortfall.** Lower bounds on what is owed are kept where their inputs establish them, with the conditions stated: known admissions, work requirements, available capacity and conservation. Where future admissions depend on unresolved allocations, no bound is claimed. Nothing is counted twice across handovers.
+- **Refinement 3: operational policies, not PAM modes.** Changing priority or shares is not a governor mode change. Dated hypothetical changes are supported in the Sandbox without altering CANON's mode semantics.
+- **Boundaries.**
+  - a separate, optional, versioned attachment;
+  - the existing mechanisms reused where their contracts apply;
+  - the golden outputs preserved;
+  - no optimisation, longest-queue rule or undocumented priority;
+  - no CANON or APPLICATION change;
+  - the record kept apart from the Sandbox.
+- **Then back to product development,** rather than widening the engine's theoretical scope.
+
+### Implementation choices (the engine's)
+
+- **The entry.** The attachment enters through the runners' options (`options.multiwork`, the type `WorkRunOptions`), so no signature changed. It is validated once per runner, against the model and work attachment digests and against the run's accounts.
+  - **Recorded only when used:** the work trace gains `stamp.multiwork` and each step's `allocations` only in a run that uses an attachment. Without one, each trace is byte for byte as before. Every golden hash is unchanged, and `WORK_VERSION` stays 0.1.0.
+- **The schedule** is the attachment's own (`fromStep`), independent of the base run's modes (refinement 3). A change of arrangement is therefore a dated entry, never an intervention on the base run.
+- **Passed-on hours** are pooled (what no work used, with any amount no share names) and offered once in the stated order, each work taking what it can use up to its ceiling.
+- **Strict priority** offers each work what those before it left. A work given nothing has a known output of 0, which settles its other terms (decision 5).
+- **Whole units** (refinement 1): the declared rule's output is the greatest whole number not above P-WORK-01's own limit on the amount given, recorded with the binding term `most-whole-units`. Without the rule, a fractional output is refused: `fractional output of indivisible work`, or `divisibility` where it is a gap.
+- **The bound** (refinement 2) is a separate pure function, `outstandingBounds`, over the work and ledger traces. It counts only the arranged works' accounts, so nothing upstream or in transit is counted, and each obligation is counted in the one account that holds it.
+  - **Its static conditions:** known claims, known yields above 0.
+  - **Its per-step conditions:** known admissions and balance.
+  - **Its known limit:** a hand-over between two works of one part is not available, because P-HANDOFF-01 runs between parts. The case of admissions depending on an unresolved allocation is tested through an upstream part whose own arrangement is unknown.
+- **First-release limits are refused when computed,** keeping the rest of the run computed: a per-unit capacity, a P-DEP-01 link, and a link's cap into an arranged part.
+- **The package** moves from 0.3.0 to 0.4.0 for the new exports. The engine and schema stay 0.4.0.
+
+## 2026-10-22: allocation under an unknown top (PROP-TOP-01)
+
+Source: James's decisions of 22 October 2026 on allocation under an unknown top, and his authorisation of the implementation plan with amendments. None of this changes CANON or APPLICATION.
+
+### Decided by James
+
+- **Q3. Unknown-top execution: the "same either way" principle, approved.**
+  - **When a draw is stated:** a resource's allocation in a step may be calculated only where its entire result is identical under every admissible top, including a top outside the claiming parts. An unknown top is never treated as "none of the claiming parts is the top".
+  - **What fixes it:** committed draws that fit are already fixed by Q-002. Under scarcity, invariance is established under the policy in force.
+  - **Policies:** no policy is assumed top-independent. A policy that needs rank keeps refusing, and a missing policy keeps its refusal.
+  - **What stays the same:** refusals carry from step to step. The order, the protected flow and the other top-dependent records stay refused.
+- **Q9. Tests.** Test-first implementation is required.
+- **Q10. The policy contract.**
+  - **The declaration:** `DrawPolicy` gains the optional `unknownTop: 'evaluate-admissible-tops'`.
+  - **What it means:** an opted-in policy is deterministic and safe to evaluate under alternative `isTop` assignments, and nothing else varies between candidates.
+  - **Who can declare it:** no per-run override enables it for an undeclared policy, and no existing custom policy is enabled silently. Where safe evaluation cannot be established, the draw is refused.
+- **Q11. Versioning (option B).**
+  - **Unchanged:** `ENGINE_VERSION` and `SCHEMA_VERSION` stay 0.4.0.
+  - **The package:** the private package moves from 0.4.0 to 0.4.1.
+  - **How changed runs are marked:** by the registered, versioned PROP-TOP-01 and its trace record.
+  - **Why:** every trace stamp carries the engine version, so raising it would move every historical known-top golden hash, and no known-top output changes. As with P-MULTIWORK-01 (package 0.3.0 to 0.4.0, engine kept at 0.4.0), the package version moves alone.
+  - **Scope:** this is a deliberate choice for this narrow change, not a release from future version increments. Nothing is tagged or published.
+
+### Carried out (the engine's)
+
+- **PROP-TOP-01 0.1.0.**
+  - **The evaluation:** `drawUnknownTop` in src/core/draw.ts, called from the core loop only while the top is an information gap. A declaring policy is called once for each candidate top: each claiming part by id, then a top elsewhere in the boundary. Only `isTop` varies, and each result is checked as any draw is.
+  - **The outcome:** the draw is stated only where every candidate gives a valid result and every receipt, fill and unused amount is identical. Otherwise it is refused for the top, with whatever the policy refused. Refusals the policy raises alike under every candidate stand alone.
+  - **The record:** each resource record carries `unknownTop` (proposal, version, `top: 'unknown'`, policy, candidates, identical, committed draws fit, result, reason).
+  - **The stamp:** it lists PROP-TOP-01 where the top is a gap and the policy declares it.
+  - **P-ALLOC-01:** it declares the evaluation, and its rule is unchanged.
+  - **A known top:** it keeps its path, with one call, no record and the same trace bytes. Every golden hash is unchanged.
+- **Dependency layers.**
+  - **What changed:** where the top is an information gap (or a separate case), `deriveLayers` reports the layers as not derived and calls no part unreached. Validation gives one `rank-underived` flag instead of a `rank-unreached` flag on every part.
+  - **Q-006 with the top unknown:** the order is refused because of the top, and the `built-in-requirement-changed` flag notes that the part may be the top.
+- **Tests:** tests/top-unknown.test.ts (T1 to T8, N1 to N8), with the eight new unknown-top traces pinned by hash. The package's outside consumer reproduces two unknown-top cases and compiles a policy written without the declaration (N9).
+- **Package:** 0.4.1, built and installed outside the repository; every golden hash reproduced.

@@ -3,7 +3,10 @@
 // A part with no dependency path to the top sits in the bottom layer: the
 // deepest layer reached from the top, and at least layer 1 (decision Q-017).
 // Position within a layer has no CANON rule (C4.3b, Q-006); the position
-// documented at mapping is used (PROP-RANK-01).
+// documented at mapping is used (PROP-RANK-01). Where the top is an
+// information gap, or is not a ranked part, no layer can be derived: no part
+// is placed in one and none is called unreached, and nothing stands in for the
+// top.
 import { isGap } from "./schema/types.js";
 function byId(a, b) {
     return a < b ? -1 : a > b ? 1 : 0;
@@ -13,7 +16,8 @@ export function deriveLayers(model) {
     const ranked = new Set(model.parts.filter((p) => !p.setsOwnAccess).map((p) => p.id));
     const layer = new Map();
     const top = model.boundary.top;
-    if (!isGap(top) && ranked.has(top)) {
+    const derived = !isGap(top) && ranked.has(top);
+    if (derived) {
         layer.set(top, 0);
         // Breadth-first from the top over "part feeds X" edges, in id order.
         const feedersOf = new Map();
@@ -40,10 +44,9 @@ export function deriveLayers(model) {
             frontier = [...next];
         }
     }
-    const unreached = [...ranked].filter((id) => !layer.has(id)).sort(byId);
+    const unreached = derived ? [...ranked].filter((id) => !layer.has(id)).sort(byId) : [];
     const bottom = Math.max(1, ...layer.values());
-    if (!isGap(top) && ranked.has(top))
-        for (const id of unreached)
-            layer.set(id, bottom);
-    return { layer, bottom, unreached, separate };
+    for (const id of unreached)
+        layer.set(id, bottom);
+    return { layer, bottom, unreached, separate, derived };
 }

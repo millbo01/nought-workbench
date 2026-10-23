@@ -79,11 +79,17 @@ function draw(input) {
         filled: input.stores.map((s) => ({ store: s.store, amount: quantity(res, Q.ZERO) })),
     };
 }
-/** P-ALLOC-01 as an allocation policy. Pass it explicitly; the core never uses it by default. */
+/**
+ * P-ALLOC-01 as an allocation policy. Pass it explicitly; the core never uses it by default.
+ * It declares PROP-TOP-01's evaluation: `draw` is pure (no I/O, state or randomness,
+ * checked by tests/static.test.ts) and reads nothing but its input, so with the top an
+ * information gap the core may call it once for each candidate top. Its rule is unchanged.
+ */
 export const gradedAllocation = {
     proposalId: P_ALLOC_01,
     readsRequirement: false,
     readsRank: false,
+    unknownTop: 'evaluate-admissible-tops',
     draw,
 };
 /**

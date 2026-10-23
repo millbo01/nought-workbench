@@ -25,7 +25,9 @@ import { validateBacklogAttachment } from "../backlog/attachment.js";
 import { startBacklog } from "../backlog/ledger.js";
 import { backlogTraceHash } from "../backlog/trace.js";
 import { validateWorkAttachment } from "../work/attachment.js";
-import { startWork } from "../work/run-work.js";
+import { resolveMultiwork, startWork } from "../work/run-work.js";
+import { checkMultiworkAccounts } from "../multiwork/attachment.js";
+import { outstandingBounds } from "../multiwork/bound.js";
 import { workTraceHash } from "../work/trace.js";
 import { conditionsOf, COUPLING_PROPOSAL, couplingImpact, staticGuard, validateCouplingAttachment } from "./attachment.js";
 import { COUPLE_VERSION } from "./trace.js";
@@ -148,7 +150,7 @@ function refusalPaths(ids, traces) {
     }));
 }
 // ---------------------------------------------------------------- the coupled run
-function coupled(model, scenario, scenarioDoc, options, hashes, work, backlog, coupling) {
+function coupled(model, scenario, scenarioDoc, options, hashes, work, backlog, coupling, multiwork) {
     const bindings = coupling.attachment.bindings.slice().sort((a, b) => byId(a.binding, b.binding));
     const notes = new Notes();
     const tv = (tag, v, t) => (v.ok ? { t: tag, v: Q.toCanonical(v.v) } : { t: tag, refused: notes.note(v.refusals, t) });
@@ -157,6 +159,7 @@ function coupled(model, scenario, scenarioDoc, options, hashes, work, backlog, c
     const workCursor = startWork(model, scenario, work.attachment, work.sha256, {
         describe: (id) => baseCursor.describe(id),
         load: (part, load) => generated.get(k2(part, load)),
+        multiwork,
     });
     const ledger = startBacklog(backlog.attachment, backlog.sha256, scenario.steps, { describe: (id) => workCursor.describe(id) });
     const steps = [];
@@ -223,7 +226,7 @@ function coupled(model, scenario, scenarioDoc, options, hashes, work, backlog, c
         refusalPaths: refusalPaths(refusals.map((r) => r.id), [['coupling', steps], ['base', base.steps], ['work', workTrace.steps], ['backlog', backlogTrace.steps]]),
         questions: notes.questions(),
     };
-    return { base, work: workTrace, backlog: backlogTrace, coupling: trace };
+    return { base, work: workTrace, backlog: backlogTrace, coupling: trace, ...(multiwork ? { multiwork: outstandingBounds(work.attachment, multiwork, workTrace, backlogTrace) } : {}) };
 }
 /**
  * Validate the model, the work, backlog and coupling attachments and the
@@ -256,5 +259,11 @@ export function runCoupled(modelDoc, scenarioDoc, workAttachmentDoc, backlogAtta
     if (!sv.ok || !sv.scenario)
         throw new ModelInvalidError('scenario', sv.issues);
     checkDrawPolicy(options);
-    return coupled(model, sv.scenario, scenarioDoc, options, { model: modelSha256, scenario: sha(scenarioDoc) }, { attachment: wv.attachment, sha256: workSha256 }, { attachment: bv.attachment, sha256: backlogSha256 }, { attachment: cv.attachment, sha256: sha(couplingAttachmentDoc) });
+    const multiwork = resolveMultiwork(options, model, modelSha256, wv.attachment, workSha256);
+    if (multiwork) {
+        const issues = checkMultiworkAccounts(multiwork.attachment, bv.attachment);
+        if (issues.some((i) => i.severity === 'error'))
+            throw new ModelInvalidError('multiwork attachment', issues);
+    }
+    return coupled(model, sv.scenario, scenarioDoc, options, { model: modelSha256, scenario: sha(scenarioDoc) }, { attachment: wv.attachment, sha256: workSha256 }, { attachment: bv.attachment, sha256: backlogSha256 }, { attachment: cv.attachment, sha256: sha(couplingAttachmentDoc) }, multiwork);
 }

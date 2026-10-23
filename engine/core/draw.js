@@ -18,7 +18,10 @@
 // actually arrives; nothing it computes reaches the governor except through a
 // level in a later step.
 import * as Q from "./rational.js";
+import { attempt, mergeRefusals, ok, refuse, refused } from "./refusal.js";
 import { policyBrokeLimit } from "./unspecified.js";
+/** The version of PROP-TOP-01's evaluation, recorded in each unknown-top record. */
+export const UNKNOWN_TOP_VERSION = '0.1.0';
 /** Check a policy's result. Returns the unused amount, or the refusal for a broken limit. */
 export function checkDraw(policy, input, result) {
     const fail = (detail) => ({ refusal: policyBrokeLimit(policy.proposalId, input.resource, detail) });
@@ -67,4 +70,68 @@ export function checkDraw(policy, input, result) {
         }
     }
     return { unused };
+}
+function sameDraw(a, b) {
+    const same = (x, y, id) => x.length === y.length && x.every((e, i) => {
+        const o = y[i];
+        return o !== undefined && id(o) === id(e) && Q.eq(o.amount.value, e.amount.value);
+    });
+    return same(a.result.received, b.result.received, (e) => e.part) && same(a.result.filled, b.result.filled, (e) => e.store) && Q.eq(a.unused, b.unused);
+}
+/**
+ * PROP-TOP-01 (an engine proposal, not a CANON rule; decision Q3, 2026-10-22):
+ * one resource's draw while the top is an information gap. `input` is the
+ * draw as the core gives it, with no part marked as the top. The candidate
+ * tops are each claiming part, by id, then a top elsewhere in the boundary
+ * (no claiming part marked): one case among the others, never a default. A
+ * policy that declares 'evaluate-admissible-tops' is called once for each,
+ * with only `isTop` varying, and each result is checked as any draw is. The
+ * draw is stated only where every candidate gives a valid result and all are
+ * the same: every receipt, every fill and the unused amount. Otherwise it is
+ * refused for the top (`topGap`), with whatever the policy refused; or, where
+ * the policy refused alike under every candidate, with those refusals alone,
+ * since they do not depend on the top. An undeclared policy is not called.
+ */
+export function drawUnknownTop(policy, input, topGap) {
+    const committed = input.parts.map((p) => (p.routeCapacity ? Q.min(p.access.value, p.routeCapacity.value) : p.access.value));
+    const committedDrawsFit = Q.le(Q.sum(committed), input.entering.value);
+    const record = (o) => ({
+        proposal: 'PROP-TOP-01', version: UNKNOWN_TOP_VERSION, top: 'unknown', policy: policy.proposalId, committedDrawsFit, ...o,
+    });
+    if (policy.unknownTop !== 'evaluate-admissible-tops') {
+        return { drawn: refused([topGap]), record: record({ candidates: [], identical: null, result: 'refused', reason: 'policy-not-declared' }) };
+    }
+    const tops = [...input.parts.map((p) => p.part), null];
+    const outcomes = tops.map((top) => {
+        const variant = { ...input, parts: input.parts.map((p) => ({ ...p, isTop: p.part === top })) };
+        return attempt(() => {
+            const result = policy.draw(variant);
+            const checked = checkDraw(policy, variant, result);
+            if ('refusal' in checked)
+                refuse(checked.refusal);
+            return { result, unused: checked.unused };
+        });
+    });
+    const candidates = tops.map((top, i) => ({ top, result: outcomes[i]?.ok ? 'valid' : 'refused' }));
+    const valid = [];
+    const refusals = [];
+    for (const o of outcomes) {
+        if (o.ok)
+            valid.push(o.v);
+        else
+            refusals.push(o.refusals);
+    }
+    const first = valid[0];
+    const identical = first === undefined ? null : valid.every((x) => sameDraw(x, first));
+    if (refusals.length === 0) {
+        if (identical === true && first !== undefined)
+            return { drawn: ok(first), record: record({ candidates, identical, result: 'computed', reason: null }) };
+        return { drawn: refused([topGap]), record: record({ candidates, identical, result: 'refused', reason: 'results-differ' }) };
+    }
+    const ids = (rs) => rs.map((r) => r.id).join('\u0000');
+    const alike = refusals[0] ?? [];
+    if (valid.length === 0 && refusals.every((rs) => ids(rs) === ids(alike))) {
+        return { drawn: refused(alike), record: record({ candidates, identical, result: 'refused', reason: 'refused-alike' }) };
+    }
+    return { drawn: refused(mergeRefusals([topGap], ...refusals)), record: record({ candidates, identical, result: 'refused', reason: 'candidate-refused' }) };
 }

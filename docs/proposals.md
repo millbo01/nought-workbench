@@ -2,7 +2,7 @@
 
 Every rule, default or convention in the engine that is not CANON, with the reason it is there. None of these is theory; each can be withdrawn or replaced by James. James's rulings on open questions are in [decisions.md](decisions.md); where a ruling is carried out by mapping data or a core check, it is named below. A run lists every proposal in force in its stamp (`stamp.proposals`), so no result can be read as canonical while a proposal shaped it.
 
-**Ids.** P-ALLOC-01, P-LOAD-01 and P-IPF-01 to P-IPF-06 are the ids of the Unified Core Spec v0.2 catalogue (engine 0.2.0, 2026-10-20). P-WORK-01 and P-DEP-01 are the Functional Work and Dependencies Contract's (2026-10-20); P-LOAD-02 is the tracking-only backlog handoff's (2026-10-20); P-COUPLE-01 is the coupled-feedback v0.3 design resolutions' (2026-10-20). PROP- ids are the engine's own, kept until they can be matched to that catalogue (Q-030).
+**Ids.** P-ALLOC-01, P-LOAD-01 and P-IPF-01 to P-IPF-06 are the ids of the Unified Core Spec v0.2 catalogue (engine 0.2.0, 2026-10-20). P-WORK-01 and P-DEP-01 are the Functional Work and Dependencies Contract's (2026-10-20); P-LOAD-02 is the tracking-only backlog handoff's (2026-10-20); P-COUPLE-01 is the coupled-feedback v0.3 design resolutions' (2026-10-20); P-HANDOFF-01 is the carryable cross-stage handovers scope's (approved in principle 2026-10-21). A handover run's base stamp names the proposals of the runner it is composed from (P-COUPLE-01 where coupled), and its handover trace names P-HANDOFF-01. PROP- ids are the engine's own, kept until they can be matched to that catalogue (Q-030).
 
 Kinds:
 - **Policy:** passed in explicitly; the core never uses it by default.
@@ -11,6 +11,8 @@ Kinds:
 - **Work extension:** computed only by `runWork`, after and apart from the base run, for a work attachment that enables it; the base run never sees it.
 - **Tracking extension:** computed only by `runBacklog` or `backlogFromTraces`, from finished base and work traces, and never fed back into a run.
 - **Coupling extension:** computed only by `runCoupled`, which takes the base run, the work and the ledger one step at a time and gives an account's eligible obligations to one load; never in `run()`, `runWork()` or `runBacklog()`.
+- **Multiwork extension:** computed in the work layer of a work run given a multiwork attachment through its options (`runWork`, `runBacklog`, `runCoupled`, `runHandoff`), for the parts it arranges; never in `run()`, and never by the base run's modes.
+- **Handover extension:** computed only by `runHandoff`, which runs the unchanged `runCoupled` or `runBacklog` on derived documents in which an account's completions become another account's admissions; never inside any other runner.
 - **Disabled:** registered so its id is reserved, and refused if anyone tries to use it.
 
 | ID | Kind | In force | Summary |
@@ -21,6 +23,8 @@ Kinds:
 | P-DEP-01 | work extension | only in runWork, for an attachment that maps links | A same-step, non-exclusive functional cap on an existing dependency (approved as optional 2026-10-20) |
 | P-LOAD-02 | tracking extension | only in runBacklog, for a backlog attachment that enables it | Carryable obligations, tracking only: a ledger of eligible obligations from a finished run and its work, with no feedback (approved 2026-10-20) |
 | P-COUPLE-01 | coupling extension | only in runCoupled, for a coupling attachment that enables it | Coupled backlog feedback: an account's eligible obligations generate one load on its own part, step by step (v0.3 design resolutions approved; implementation authorised 2026-10-20) |
+| P-MULTIWORK-01 | multiwork extension | only in a work run given a multiwork attachment | Several works on one part, drawing on one finite productive balance under an explicitly mapped, dated arrangement: fixed shares or a strict order, with no default (approved 2026-10-21; first release) |
+| P-HANDOFF-01 | handover extension | only in runHandoff, for a handover attachment that enables it | Carryable cross-stage handovers: an account's completions become admissions of an account on another part, same-step or next-step as declared, forward-only, by composition of the unchanged runners (approved in principle 2026-10-21; first release) |
 | P-IPF-01 to P-IPF-06 | disabled | never | The IPF proposals of the Unified Core Spec catalogue; not defined in this repository |
 | PROP-STEP-01 | core loop | every run | Step sequence, the timing of sensing, interventions before switches |
 | PROP-FLOW-01 | core loop | every run | Only stores hold resource from one step to the next |
@@ -29,6 +33,7 @@ Kinds:
 | PROP-ROUTE-01 | core loop | every run | Route capacity as a rule on sensed levels; routes from the shared flow only (decision Q-010); no route, no network cap |
 | PROP-STORE-01 | schema | runs with a store | Store release and fill limits as rules on sensed levels |
 | PROP-SILENCE-01 | schema | runs where a rule reads a level | A rule states its response to silence read as alarm |
+| PROP-TOP-01 | core loop | runs whose top is an information gap, with a policy that declares it | Allocation under an unknown top (0.1.0): a resource's draw is stated only where the policy gives the same valid result under every candidate top (decision Q3, 2026-10-22) |
 | APP-04 | check | scenario validation | A scenario is a load applied to a system, not a system |
 | APP-08 | check | every run (flag) | A top short while another part is not is flagged |
 
@@ -53,6 +58,8 @@ Kinds:
 - **No look-ahead** (alignment item 9): the rule divides what actually arrives in this step. That is the arithmetic of the shared flow, an arrangement declared in advance, not the governor responding to this step's arrival; the governor sees the consequence only through levels in a later step. If James reads the graded cut as the governor's response, it would be look-ahead and needs another form (Q-031).
 
 **Checks:** `checkGradedAllocationData(model)` flags a missing or non-positive grading, and any mode where a lower-ranked part has a smaller grading than a higher-ranked one for the same resource. Both fixtures pass.
+
+**Under an unknown top (2026-10-22):** P-ALLOC-01 declares PROP-TOP-01's evaluation (`unknownTop: 'evaluate-admissible-tops'`). Its `draw` is pure and reads nothing but its input, so with the top an information gap the core may call it once for each candidate top (PROP-TOP-01, below). The rule above is unchanged: under a known top, it is called once, exactly as before.
 
 ## P-LOAD-01: per-part unit loss and rebuild (approved form, off by default)
 
@@ -223,6 +230,133 @@ Golden hashes of all four traces are in tests/golden/couple-hashes.json (`npm ru
 
 **Not in this release:** partial, blocked or scheduled obligations; ageing, expiry, withdrawals; cross-account or cross-part bindings; prioritisation; damage or degradation; inferred demand; any extra resource draw for work; delayed sensing of a generated load; Q-028; IPF.
 
+## P-HANDOFF-01: carryable cross-stage handovers (approved in principle 2026-10-21; first release)
+
+**Source:** [p-handoff-01-scope.md](p-handoff-01-scope.md), reviewed by James on 2026-10-21. It is approved in principle, with four decisions, and its first release is authorised ([decisions.md](decisions.md)). It is an optional work-accounting proposal at contract version 0.1: not CANON, not a PAM resource transfer, and no new law.
+
+**Why a proposal:** nothing else carries one account's completions into another account:
+- P-LOAD-02's admissions are an external input series;
+- P-COUPLE-01 binds an account only to a load of its own part;
+- P-DEP-01 is a same-step cap that keeps no stock.
+
+So a two-stage workflow (a booking, then a first visit) could not let the second stage complete work admitted in earlier steps.
+
+**Where it runs:** only in `runHandoff(model, scenario, workAttachment, backlogAttachment, couplingAttachment | null, handoffAttachment, options)` (src/proposals/handoff/). It runs the unchanged `runCoupled`, or `runBacklog` where nothing is coupled, on derived documents. No runner was changed.
+
+**The attachment** (a separate document; examples in fixtures/handoff/) holds:
+- its version and id;
+- the model, the backlog attachment and, where the run is coupled, the coupling attachment, each by id, version and exact digest (`null` for no coupling, stated);
+- the opt-in, `P-HANDOFF-01` at 0.1;
+- handovers, each with:
+  - `from` and `to` accounts on different parts;
+  - a correspondence: k per completion, above 0, with `fromUnit` and `toUnit` exactly the accounts' obligation units;
+  - timing: `same-step` or `next-step`, declared, with no default;
+  - an eligibility claim;
+  - for next-step, the opening in transit (a value or an explicit gap).
+
+  Each claim carries evidence: `documented`, `estimated`, `assumed` or `unknown`.
+
+**The calculation**, for handover h from U to V in step t:
+- H_t = k x C^U_t, refused where C^U_t is refused, or where it is fractional and V is indivisible;
+- A_t = H_t (same-step), or H_{t-1} (next-step; A_0 is the opening in transit);
+- N^V_t = V's own series + A_t;
+- then P-LOAD-02's ledger and, where V is bound, P-COUPLE-01, unchanged.
+
+V therefore completes from D^V_t = B^V_t + N^V_t, including obligations admitted in earlier steps.
+
+**Forward-only, and passes:**
+- **The analysis.** A conservative static analysis (`handoffAnalysis`) finds what each downstream account's admissions can reach. It covers its generated load, shared resource allocations, levels and the rules reading them, governor bands and mode switches (which reach everything), P-DEP-01 links and further handovers.
+- **Refusal.** A handover on a cycle of dependence is refused when computed (`handoff/unsupported-rule not forward-only <h>`).
+- **Passes.** The rest are computed in a number of passes fixed in advance: 1 + the longest chain of dependence. Pass 0 holds explicit gaps; no pass repeats to converge.
+- **The safeguard.** Every upstream must be identical in the last two passes, and each handover must conserve. A failure throws, with nothing returned.
+
+**Rejected before anything is computed:**
+- an unknown account, the same account at both ends, or both accounts on one part;
+- units that are not the accounts' own, or a ratio of 0 or less;
+- a missing or unknown timing;
+- a missing or misplaced opening in transit;
+- an unknown claim;
+- two handovers out of one account, or a cycle of handovers;
+- a P-DEP-01 link mapped beside the handover;
+- digests that do not match.
+
+**Flagged:** assumed or estimated claims, a downstream account with admissions of its own (double counting), k not whole into an indivisible account, an unknown opening in transit, the reach of each handover, and a handover that is not forward-only.
+
+**Records:** the handover trace and the derived documents are delivered with the last pass's traces.
+- **The handover trace's stamp** holds the passes, the trace hashes, the derived attachments' digests labelled derived beside the mapped ones, and per handover its claims, conditions and analysis.
+- **Per step and handover** it records completions, the amount handed over, the amount admitted, and what is in transit.
+- **The derived admissions claim** says it is generated from upstream completions.
+- **Replay.** The unchanged runner on the derived documents reproduces the traces byte for byte.
+
+**Fixtures:**
+- `two-stage-carry-over`: service clears its earlier balance once its hours rise;
+- `referral-pathway-baseline` and `referral-pathway-more-visiting`: the synthetic Westbridge referral pathway, where 71 visiting hours clear the 12 visits booked earlier by week 4.
+
+Golden hashes of all five traces are in tests/golden/handoff-hashes.json (`npm run golden:handoff`).
+
+**Not in this release:** handovers between parts that influence each other (refused, even next-step, where an in-loop coordinator would compute them); one account's completions divided or duplicated between accounts (HQ-01); rework loops (HQ-03); priority between carried and new obligations (HQ-04); withdrawals, ageing or expiry; any resource moved by a handover.
+
+## P-MULTIWORK-01: several works on one part (approved 2026-10-21; first release)
+
+**Source:** `wq-08-scope.md`, approved by James on 2026-10-21 with three refinements ([decisions.md](decisions.md)). It is an optional work-layer proposal at contract version 0.1: not CANON, and no change to PAM.
+
+**Why a proposal:** P-WORK-01 refuses several works on one part (its decision 8: how one recipe is shared is not given). A part that does several kinds of productive work from one finite balance (James's framing of 2026-10-21) needs that division given, and only an organisation's documented arrangement can give it.
+
+**Where it runs:** in the work layer of `runWork`, `runBacklog`, `runCoupled` and `runHandoff`, when `options.multiwork` gives an attachment (src/proposals/multiwork/). Without one, every runner and trace is exactly as before. P-LOAD-02, P-COUPLE-01 and P-HANDOFF-01 are reused unchanged.
+
+**The attachment** (format 0.1.0) holds:
+- its version and id;
+- the model and the work attachment by id, version and exact digest;
+- the opt-in, `P-MULTIWORK-01` at 0.1;
+- for each arranged part:
+  - the shared resource;
+  - every work on the part, with its divisibility (`indivisible`, `divisible` or a gap) and, for indivisible work, an optional declared rule `most-whole-units-within-allocation` with its evidence;
+  - a dated schedule from step 0 of arrangements: fixed shares (amounts, with `whenBalanceBelow` `refuse` or `scale-down`, or fractions summing to at most 1; unused `idle` or `passed-on` in a stated order), strict priority (an order), or a gap. Each arrangement carries its evidence.
+
+**The calculation** (part p, shared resource r, step t):
+- **The balance** W is p's remainder for work on r, read once.
+- **The arrangement** in force gives each work an amount: its share; or, under a strict order, what those before it left; plus, where unused hours are passed on, what no work used, offered once in order.
+- **Each work's output** is P-WORK-01's least of reference output, capacity and yield x recipe limit on that amount. A fractional output is:
+  - kept for divisible work;
+  - completed in the most whole units for indivisible work with the declared rule;
+  - refused otherwise.
+- **Used** is output x recipe / yield, and **unused** is W less the sum used. A breach of either is a defect.
+- **Unknown arrangement:** each work's output is refused. The balance, the works' demand and shortfall and each work's upper bound are kept, and a known 0 still settles.
+
+**The outstanding-work trace,** returned by the runners with a ledger:
+- **The bound:** the hours owed to each arranged part's accounts are at least the opening, plus the admissions, less the balance, never below 0, each account converted at its work's recipe / yield.
+- **When it holds:** only where every counted account's claims, every counted yield (above 0), and each step's admissions and balance are known.
+- **When it stops:** once refused, it stays refused.
+- **The check:** a known amount owed below the bound is a defect.
+
+**Rejected before anything is computed:**
+- digests or versions that do not match;
+- a part with fewer than two works;
+- a works list that is not exactly the part's works;
+- a work not using the shared resource, or a second resource shared by two works;
+- a schedule that does not start at 0 or does not increase;
+- shares that do not name every work, negative shares, or fractions above 1;
+- a missing `whenBalanceBelow` or `unused`;
+- an order that is not every work once;
+- a whole-unit rule on work that is not indivisible;
+- an account whose divisibility disagrees with its work's.
+
+**Flagged:** an unknown or conditional arrangement, unknown divisibility, an unknown whole-unit rule, a per-unit capacity and a P-DEP-01 link (both refused when computed).
+
+**Records:**
+- **Each work step** of a run that uses it has an `allocations` record per arranged part, holding:
+  - the balance, once;
+  - per work, what it was given, used and produced, its upper bound, its ceiling and what the ceiling would need;
+  - the used and unused hours;
+  - the demand and the shortfall.
+- **The work stamp** names the attachment and P-MULTIWORK-01.
+
+**Not in this release:**
+- other arrangement forms: proportional, weighted, by age, by queue length, or reading a sensed level;
+- a second shared resource, partly interchangeable skills, or a shared finite constraint (WQ-01);
+- a per-unit capacity, or a P-DEP-01 link, on an arranged part;
+- a hand-over between two works of one part (P-HANDOFF-01 runs between parts).
+
 ## PROP-SENSE-01: the sending dial (decision Q-004)
 
 James's ruling (2026-10-20): each level gets a mapping dial for what its producing part sends when short, either "keeps sending", or "stops once the part's shortfall exceeds a stated amount", recorded as never sent. With no dial set, refuse that level rather than guess.
@@ -259,6 +393,11 @@ The IPF proposals of the Unified Core Spec catalogue. Their definitions are not 
 
 **Why:** CANON 4 says rank within a layer "comes from access and, where access is built in, from requirement" (C4.3b), but gives no rule for computing a position from them (Q-006). APPLICATION.md (Applying CANON 4) says "Rank within a layer comes from access as documented at mapping". The engine takes the position declared on the part (or on the mode) and never derives one. Layers themselves are derived from dependencies (C4.3a). A part with no dependency path to the top sits in the bottom layer, the deepest layer reached from the top and at least layer 1 (decision Q-017); the trace flags it (`unreached-part-kept-access`) in a step where it receives its full committed draw with its access not lowered while a part ranked above it is cut (receives less than its committed draw, or has its access lowered). Where a built-in part's requirement changes, the place may move by CANON 3 (C3.7), so the recorded order is refused from that step until the next snapshot; the top is excluded because it never changes within a boundary (C4.4a). The declared order is also what tells a mode change from an arrangement revision (alignment item 7).
 
+**With the top an information gap (2026-10-22):**
+- **No layers:** none is derived (`Layers.derived` is false), no part is placed in a layer or called unreached, and validation gives one `rank-underived` flag instead of a `rank-unreached` flag on every part. Nothing stands in for the top, and Q-017 applies only under a known top.
+- **The order:** refused because of the top.
+- **The Q-006 flag:** a built-in part whose requirement changes is still flagged, noting that it may be the top, whose place never moves.
+
 ## PROP-ROUTE-01: route capacity as a rule; no route, no network cap
 
 **Why:** CANON 2 says the routes can hold realised flow below access (C2.5n) but not how a route's capacity is given. A route carries a capacity rule of the same declarative kind as a setting (constant, step or piecewise-linear on a sensed level), governor-set or built-in (C3.6a: access is set by the governor "or built into the part or route"). Routes run from the one shared flow of their resource to parts only (decision Q-010): store releases and outside input enter the shared flow, and a ring-fenced allocation is a built-in access setting on the receiving part, not a route. A part with no declared route has no network cap ("use the fewest components that do the job", APPLICATION 5). Whether a route's capacity rule is a setting, and whether changing it is a mode change, is Q-021. This phase computes one route per part per resource (an engineering limit; a second route is rejected).
@@ -275,6 +414,56 @@ The IPF proposals of the Unified Core Spec catalogue. Their definitions are not 
 - **a built-in rule:** refused as an unsupported rule (Q-012).
 
 No delivered value, healthy reading or zero is ever recorded for a silent level, and its true value and every shortfall are still recorded. A threshold switch on a silent level read as no intervention does not cross; read as alarm, the transition is unmapped and refused (Q-013).
+
+## PROP-TOP-01: allocation under an unknown top (0.1.0; decision Q3, 2026-10-22)
+
+**What it is:** an engine proposal for evaluating with partial information. It is not a CANON rule and adds no theory. It states a draw only where the draw does not depend on the unknown, and establishes nothing about which part is the top.
+
+**What each source contributes:**
+- **CANON:** the governor protects the top by limiting everyone else's access first (C4.2, CANON 4 line 53). Rank runs from the top down by dependency (C4.3a). The protected flow is the flow to the top (C2.4). So who is cut, where committed draws exceed what entered, depends on the top.
+- **Approved decisions:**
+  - **Q-002:** where the committed draws fit what entered, each part receives its committed draw, whatever the policy. The core checks this of every policy.
+  - **Q3 (22 October 2026):** with the top unknown, a resource's draw in a step is calculated only where its whole result is identical under every admissible top. A top elsewhere in the boundary is admissible. No policy is assumed top-independent. A policy that needs rank keeps refusing. A missing policy keeps its refusal. The order, the protected flow and the other top-dependent records stay refused.
+  - **Q1 and Q2:** an institution's whole organisation is its boundary, and its top stays unknown until evidence establishes it. These are the cases this proposal serves.
+- **P-ALLOC-01:** the optional allocation policy. Its rule is unchanged. It declares the evaluation, because its `draw` is pure.
+- **PROP-TOP-01:** the evaluation itself, below.
+
+**What it does** (`drawUnknownTop` in src/core/draw.ts, called from the core loop only while the top is an information gap):
+1. **Prerequisites first:** everything the draw needs is checked first, in the existing order:
+   - a resource that cannot be computed;
+   - the arrangement;
+   - the policy (none: the existing Q-001 refusal);
+   - the order, for a policy that reads rank (refused: the order needs the top);
+   - access, route capacity, requirement if read, fill room, and what entered.
+2. **The declaration:** a policy that does not declare `unknownTop: 'evaluate-admissible-tops'` is not called. Its draw is refused for the top (`unknown-prerequisite $.boundary.top`), as before. Nothing outside a policy can declare it on its behalf, and there is no per-run override.
+3. **The candidate tops:** each part claiming the resource (a ranked part with a setting in force for it), in id order, and then a top elsewhere in the boundary. The last is a part that does not claim the resource, or one the mapping does not contain: no claiming part is marked as the top. It is one candidate among the others, never an assumption or a default.
+4. **One call per candidate:** the policy is called once for each candidate, with nothing but `isTop` varying, and each result is checked as any draw is (`checkDraw`: access, route capacity, room, what entered, and Q-002).
+5. **The outcome:**
+   - **Stated:** the draw is stated only where every candidate gives a valid result and all are identical: every receipt, every fill and the unused amount.
+   - **Refused for the top:** where the valid results differ, or where the policy refused or broke a limit under some candidates. Any refusals the policy raised are carried with it.
+   - **Refused alike:** where the policy refused alike under every candidate, its refusals stand alone, because they do not depend on the top.
+
+**What it records:**
+- **`ResourceRecord.unknownTop`:** present only while the top is a gap. It holds the proposal and its version (`UNKNOWN_TOP_VERSION`, 0.1.0), `top: 'unknown'`, the policy, the candidates with whether each gave a valid result, whether the valid results are identical, and whether the committed draws fit (so that Q-002 fixed the receipts whatever the top). It also holds the result and, for a refusal, the reason: `results-differ`, `candidate-refused`, `refused-alike`, `policy-not-declared` or `prerequisite-refused`.
+- **`stamp.proposals`:** lists PROP-TOP-01 in every run whose top is an information gap and whose policy declares the evaluation.
+
+**What it does not do:**
+- It never chooses, infers or ranks a top.
+- The order, the protected flow and its indicators, and the `top-short-another-not` and Q-017 flags stay refused or absent while the top is unknown. So a stated draw is never a protected-top allocation.
+- A known top takes the existing path, with one call and no new record or stamp entry. Its traces are unchanged byte for byte, and so is every golden hash.
+
+**Where it makes a difference (P-ALLOC-01):**
+- **Committed draws that fit:** stated. Q-002 fixes the receipts, and P-ALLOC-01 fills stores by room without reading the top.
+- **One claimant:** stated, since it receives all that entered whether it is the top or not. A part without a grading is refused, because a top elsewhere needs its grading.
+- **Two or more claimants whose committed draws exceed what entered:** refused, even where what entered covers every requirement.
+
+**Known limits:**
+- **Purity:** the declaration is the policy's own statement of purity, as determinism is today. The core cannot detect an impure policy.
+- **The candidate set:** it is always the claimants and a top elsewhere. A mapping cannot narrow it, for example to a few possible tops (not proposed).
+- **The draw as a whole:** a draw is stated or refused as a whole. Totals that would be the same under every top (for example what the parts receive between them, where all that entered is taken) are not stated separately.
+- **The undeclared case:** a policy without the declaration stays refused, even where Q-002 alone would fix its result.
+
+**Tests:** tests/top-unknown.test.ts, cases T1 to T8 and N1 to N8, with the unknown-top traces pinned by hash. The package's outside consumer (N9) reproduces two cases from the installed tarball.
 
 ## APP-04: a scenario is a load applied to a system (APPLICATION 5)
 
