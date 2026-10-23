@@ -2,11 +2,11 @@
 
 This page is for GPT and other reviewers. It is updated at the end of each piece of work on the N-ought engine, and published with the workbench at https://n-ought.com/nought-workbench/docs/for-gpt.md (every document below sits beside it).
 
-**Updated:** 2026-10-22.
+**Updated:** 2026-10-23.
 
 ## Where the engine stands
 
-- **Versions.** Engine 0.4.0 and schema 0.4.0; the private package 0.4.1. PROP-TOP-01, allocation under an unknown top, is at 0.1.0. The work extension (P-WORK-01, P-DEP-01) is at 0.1.0, the backlog extension (P-LOAD-02, tracking only) at 0.1.0, the coupled run (P-COUPLE-01) at contract version 0.1 (attachment and trace 0.1.0), the handover run (P-HANDOFF-01) at contract version 0.1 (attachment and trace 0.1.0), and several works on one part (P-MULTIWORK-01) at contract version 0.1 (attachment and trace 0.1.0) is new. The package is at 0.4.0.
+- **Versions.** Engine 0.4.0 and schema 0.4.0; the private package 0.4.1. PROP-TOP-01, allocation under an unknown top, is at 0.1.0. The work extension (P-WORK-01, P-DEP-01) is at 0.1.0, the backlog extension (P-LOAD-02, tracking only) at 0.1.0, the coupled run (P-COUPLE-01) at contract version 0.1 (attachment and trace 0.1.0), the handover run (P-HANDOFF-01) at contract version 0.1 (attachment and trace 0.1.0), and several works on one part (P-MULTIWORK-01) at contract version 0.1 (attachment and trace 0.1.0) is new.
 - **Tests.** 339 engine tests pass, and the 3 package tests. Every historic golden hash is unchanged, and the compiled browser engine gives every golden hash, coupled runs included.
 - **Latest work: allocation under an unknown top, PROP-TOP-01 0.1.0** (2026-10-22, James's decision Q3: "same either way"). An engine proposal for partial information, not a CANON rule. See [proposals.md](proposals.md) and [decisions.md](decisions.md).
   - **The case:** a model may leave its top as an information gap. Before this, every draw was refused then, even where nothing depended on the top.
@@ -73,7 +73,7 @@ Points still worth a reviewer's eye, from the P-COUPLE-01 report's limitations:
 - [p-handoff-01-scope.md](p-handoff-01-scope.md): P-HANDOFF-01, carryable cross-stage handovers: the scope as reviewed, James's decisions, and the first release's result.
 - [p-couple-01-report.md](p-couple-01-report.md): the P-COUPLE-01 implementation report.
 - [handover-for-gpt.md](handover-for-gpt.md): the engine as built. It has the exported types, verbatim from the compiler, plus the validation rules, step sequence, refusal categories, proposals and open questions. The coupled run is in sections 2, 3 and 5.
-- [decisions.md](decisions.md): James's rulings, dated, with what the engine does, and the engine's own implementation choices (P-COUPLE-01's are in the last section).
+- [decisions.md](decisions.md): James's rulings, dated, with what the engine does, and the engine's own implementation choices (P-COUPLE-01's are in its 2026-10-20 entries "design recommendations approved" and "P-COUPLE-01 0.1, authorised and implemented").
 - [proposals.md](proposals.md): every non-canonical rule, with its reason.
 - [open-questions.md](open-questions.md): the question log, with statuses.
 - Reviews: [work-contract-review.md](work-contract-review.md), [dynamic-arrangements-review.md](dynamic-arrangements-review.md), [coupled-feedback-review.md](coupled-feedback-review.md).
